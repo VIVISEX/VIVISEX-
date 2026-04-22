@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VIVISEX</title>
+<style>
+body{margin:0;font-family:serif;background:#000;color:#fff}
+.container{padding:40px;text-align:center}
+h1{font-size:48px;letter-spacing:6px}
+.tagline{margin-top:10px;color:#c9a96e;font-size:18px}
+.btn{margin-top:30px;padding:15px 30px;background:#c9a96e;color:#000;text-decoration:none;font-weight:bold;border-radius:5px}
+.section{margin-top:80px}
+.card{background:#111;padding:25px;margin:20px;border-radius:12px}
+.lock{color:#c9a96e;font-size:14px;margin-top:10px}
+</style>
+</head>
+<body>
+
+<div class="container">
+<h1>VIVISEX</h1>
+<div class="tagline">Desire • Intimacy • Luxury</div>
+<p>Only for those who seek more.</p>
+<a href="#member" class="btn">解鎖會員</a>
+</div>
+
+<div class="container section">
+<h2>會員專屬體驗</h2>
+<div class="card">高端性感內衣｜只對會員開放</div>
+<div class="card">情趣精品｜隱私配送</div>
+<div class="card">專屬價格｜未公開販售</div>
+</div>
+
+<div class="container section" id="member">
+<h2>加入 VIVISEX 會員</h2>
+<div class="card">月費 NT$299<br><span class="lock">解鎖所有商品</span></div>
+<div class="card">年費 NT$2999<br><span class="lock">最划算選擇</span></div>
+<a href="#" class="btn">立即加入</a>
+</div>
+
+<div class="container section">
+<h2>性感內衣系列</h2>
+<div class="card">黑色蕾絲誘惑款<br><span class="lock">🔒 會員專屬價格</span></div>
+<div class="card">極致貼身設計款<br><span class="lock">🔒 會員專屬價格</span></div>
+<div class="card">高端絲質睡衣款<br><span class="lock">🔒 會員專屬價格</span></div>
+</div>
+
+<div class="container section">
+<h2>情趣精品系列</h2>
+<div class="card">私密探索系列<br><span class="lock">🔒 會員專屬價格</span></div>
+<div class="card">高端質感情趣用品<br><span class="lock">🔒 會員專屬價格</span></div>
+<div class="card">情境升溫系列<br><span class="lock">🔒 會員專屬價格</span></div>
+</div>
+
+<div class="container section">
+<h2>聯絡我們</h2>
+<p>Email: support@vivisex.com</p>
+</div>
+
+</body>
+</html>
