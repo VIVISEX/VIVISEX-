@@ -1,0 +1,51 @@
+{
+  "version": "A2_012_FINMIND_BACKFILL_V1.0.1",
+  "next_date": "2022-01-01",
+  "next_broker_index": 0,
+  "mapped": {
+    "BNP": {
+      "id": "8900",
+      "name": "法銀巴黎"
+    },
+    "CITI": {
+      "id": "1590",
+      "name": "花旗環球"
+    },
+    "GS": {
+      "id": "1480",
+      "name": "美商高盛"
+    },
+    "JP": {
+      "id": "8440",
+      "name": "摩根大通"
+    },
+    "ML": {
+      "id": "1440",
+      "name": "美林"
+    },
+    "MQ": {
+      "id": "1360",
+      "name": "港商麥格理"
+    },
+    "MS": {
+      "id": "1470",
+      "name": "台灣摩根士丹利"
+    },
+    "NO": {
+      "id": "1560",
+      "name": "港商野村"
+    },
+    "UB": {
+      "id": "1650",
+      "name": "新加坡商瑞銀"
+    },
+    "WL": {
+      "id": "1380",
+      "name": "台灣匯立"
+    }
+  },
+  "requests_total": 0,
+  "rows_total": 0,
+  "completed": false,
+  "lookahead": 0
+}

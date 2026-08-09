@@ -1,0 +1,59 @@
+{
+  "version": "A2_012_FINMIND_BACKFILL_V1.0.1",
+  "time": "2026-08-09T18:32:02.264144+00:00",
+  "lookahead_test": {
+    "replay_date": "2023-05-15",
+    "input_data_date": "2023-05-16",
+    "expected": "STOP_LOOKAHEAD",
+    "actual": "STOP_LOOKAHEAD",
+    "result": "PASS_NEGATIVE_BLOCKED"
+  },
+  "mapped": {
+    "BNP": {
+      "id": "8900",
+      "name": "法銀巴黎"
+    },
+    "CITI": {
+      "id": "1590",
+      "name": "花旗環球"
+    },
+    "GS": {
+      "id": "1480",
+      "name": "美商高盛"
+    },
+    "JP": {
+      "id": "8440",
+      "name": "摩根大通"
+    },
+    "ML": {
+      "id": "1440",
+      "name": "美林"
+    },
+    "MQ": {
+      "id": "1360",
+      "name": "港商麥格理"
+    },
+    "MS": {
+      "id": "1470",
+      "name": "台灣摩根士丹利"
+    },
+    "NO": {
+      "id": "1560",
+      "name": "港商野村"
+    },
+    "UB": {
+      "id": "1650",
+      "name": "新加坡商瑞銀"
+    },
+    "WL": {
+      "id": "1380",
+      "name": "台灣匯立"
+    }
+  },
+  "mapped_count": 10,
+  "sponsor_canary": {
+    "status": "SPONSOR_REQUIRED",
+    "reason": "FINMIND_SPONSOR_PERMISSION_REQUIRED: Your level is register. Please update your user level. Detail information:https://finmindtrade.com/analysis/#/Sponsor/sponsor"
+  },
+  "result": "STOP_SPONSOR_REQUIRED"
+}
