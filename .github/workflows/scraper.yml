@@ -1,0 +1,67 @@
+name: QTS A4 TWSE MIS preopen scraper
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_mode:
+        description: Run mode
+        required: true
+        default: env_test
+        type: choice
+        options:
+          - env_test
+          - live
+  schedule:
+    - cron: "25 0 * * 1-5"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qts-a4-mis-preopen
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    env:
+      TZ: Asia/Taipei
+      STOCKS_FILE: stocks.csv
+      OUTPUT_DIR: output/mis
+      POLL_SECONDS: "5"
+      START_TIME: "08:30:00"
+      PREOPEN_END: "09:00:00"
+      END_TIME: "09:30:00"
+      BATCH_SIZE: "50"
+      MAX_RETRIES: "5"
+      REQUEST_TIMEOUT: "8"
+      RUN_MODE: ${{ github.event_name == 'schedule' && 'live' || inputs.run_mode }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas requests pyarrow shioaji
+
+      - name: Run A4 MIS scraper
+        run: |
+          python "A4_001_TWSE_MIS盤前試撮抓取.py"
+
+      - name: Upload captured data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qts-a4-mis-${{ github.run_id }}
+          path: output/mis/
+          if-no-files-found: warn
+          retention-days: 90
