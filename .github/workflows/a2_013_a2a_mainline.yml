@@ -1,0 +1,48 @@
+name: A2_013 A2-A Mainline
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'A2_013/**'
+      - '.github/workflows/a2_013_a2a_mainline.yml'
+permissions:
+  contents: write
+concurrency:
+  group: a2-013-a2a-mainline
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install
+        run: pip install requests
+      - name: Run A2-A mainline
+        run: python A2_013/主線回補.py
+      - name: Persist A2-A outputs
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add A2_013/
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "A2_013: persist A2-A ASOF outputs"
+            git push
+          fi
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: A2_013_A2_ASOF
+          path: |
+            A2_013/A2_ASOF_V1_READY.json
+            A2_013/ASOF_PRICE_PLAN.json
+            A2_013/A2_B_WAITING_EXTERNAL_SOURCE.json
