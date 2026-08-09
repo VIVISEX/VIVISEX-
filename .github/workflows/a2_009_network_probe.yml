@@ -1,22 +1,31 @@
 name: A2_009 Network Probe
+
 on:
   workflow_dispatch:
   push:
     paths:
       - 'A2_009/**'
       - '.github/workflows/a2_009_network_probe.yml'
+
+permissions:
+  contents: write
+
 jobs:
   probe:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
       - run: pip install selenium
+
       - name: Run A2_009 network probe
         run: python A2_009/network_probe.py
+
       - name: Upload diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -24,3 +33,19 @@ jobs:
           name: A2_009_network_probe_output
           path: A2_009/output/
           if-no-files-found: warn
+
+      - name: Persist diagnostic text to repository
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p A2_009_results
+          cp A2_009/output/report.json A2_009_results/report.json 2>/dev/null || true
+          cp A2_009/output/network.json A2_009_results/network.json 2>/dev/null || true
+          cp A2_009/output/body.txt A2_009_results/body.txt 2>/dev/null || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add A2_009_results
+          if ! git diff --cached --quiet; then
+            git commit -m "A2_009: persist latest network probe result"
+            git push
+          fi
