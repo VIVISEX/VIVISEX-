@@ -1,0 +1,52 @@
+name: A2_008 Browser Canary
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'A2_008/**'
+      - '.github/workflows/a2_008_history_backfill.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: A2_008/requirements.txt
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && pip install -r A2_008/requirements.txt
+
+      - name: Show Chrome version
+        run: google-chrome --version || chromium-browser --version || chromium --version
+
+      - name: Run A2_008 Chromium canary
+        id: canary
+        continue-on-error: true
+        run: python A2_008/runner.py
+
+      - name: Upload diagnostics and result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: A2_008_canary_output
+          path: A2_008/output/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Fail workflow if canary failed
+        if: steps.canary.outcome != 'success'
+        run: exit 1
