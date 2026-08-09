@@ -2,6 +2,9 @@ name: A2_012 FinMind Backfill
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - 'A2_012/run_trigger.txt'
   schedule:
     - cron: '17 * * * *'
 
