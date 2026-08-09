@@ -1,0 +1,41 @@
+name: A2_011 Interaction Probe
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'A2_011/**'
+      - '.github/workflows/a2_011_interaction_probe.yml'
+permissions:
+  contents: write
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install selenium
+      - name: Run interaction probe
+        run: python A2_011/interaction_probe.py
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: A2_011_interaction_probe_output
+          path: A2_011/output/
+          if-no-files-found: warn
+      - name: Persist report
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p A2_011_results
+          cp A2_011/output/report.json A2_011_results/report.json 2>/dev/null || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add A2_011_results
+          if ! git diff --cached --quiet; then
+            git commit -m "A2_011: persist latest interaction probe result"
+            git push
+          fi
