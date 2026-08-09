@@ -1,0 +1,14 @@
+{
+  "start_date": "2022-01-01",
+  "end_date": "2025-06-30",
+  "canary": {
+    "stock": "2330",
+    "stock_name": "台積電",
+    "broker_code": "1470",
+    "broker_name": "台灣摩根士丹利"
+  },
+  "asof_guard": {
+    "replay_date": "2023-05-15",
+    "forbidden_from": "2023-05-16"
+  }
+}
