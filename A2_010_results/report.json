@@ -1,0 +1,2749 @@
+{
+  "version": "A2_010_FORM_PROBE_V1.0.0",
+  "pages": [
+    {
+      "requested": "https://5850web.moneydj.com/z/zc/zco/zco_2330.djhtm",
+      "current_url": "https://5850web.moneydj.com/z/zc/zco/zco_2330.djhtm",
+      "title": "主力賣買超-2330",
+      "forms": [
+        {
+          "name": "F",
+          "id": "",
+          "method": "get",
+          "action": "https://5850web.moneydj.com/z/zc/zco/zco_2330.djhtm",
+          "onsubmit": "return false;",
+          "inputs": [
+            {
+              "tagName": "INPUT",
+              "type": "radio",
+              "name": "radio1",
+              "id": "",
+              "value": "on",
+              "onclick": null,
+              "onchange": null
+            },
+            {
+              "tagName": "INPUT",
+              "type": "radio",
+              "name": "radio1",
+              "id": "",
+              "value": "on",
+              "onclick": "javascript:window.open('/z/zc/zco/zco0.djhtm?a=2330&b=6010','_self')",
+              "onchange": null
+            },
+            {
+              "tagName": "SELECT",
+              "type": "select-one",
+              "name": "sel_Broker",
+              "id": "",
+              "value": "6010",
+              "onclick": null,
+              "onchange": "javascript:changeSelect2()",
+              "options": [
+                {
+                  "value": "6010",
+                  "text": "(牛牛牛)亞證券",
+                  "selected": true
+                },
+                {
+                  "value": "6620",
+                  "text": "口袋證券",
+                  "selected": false
+                },
+                {
+                  "value": "1030",
+                  "text": "土銀",
+                  "selected": false
+                },
+                {
+                  "value": "8890",
+                  "text": "大和國泰",
+                  "selected": false
+                },
+                {
+                  "value": "6460",
+                  "text": "大昌",
+                  "selected": false
+                },
+                {
+                  "value": "5050",
+                  "text": "大展",
+                  "selected": false
+                },
+                {
+                  "value": "8770",
+                  "text": "大鼎(停)",
+                  "selected": false
+                },
+                {
+                  "value": "6160",
+                  "text": "中國信託",
+                  "selected": false
+                },
+                {
+                  "value": "8520",
+                  "text": "中農",
+                  "selected": false
+                },
+                {
+                  "value": "9800",
+                  "text": "元大",
+                  "selected": false
+                },
+                {
+                  "value": "2200",
+                  "text": "元大期貨",
+                  "selected": false
+                },
+                {
+                  "value": "5960",
+                  "text": "日茂",
+                  "selected": false
+                },
+                {
+                  "value": "5660",
+                  "text": "日進",
+                  "selected": false
+                },
+                {
+                  "value": "7750",
+                  "text": "北城",
+                  "selected": false
+                },
+                {
+                  "value": "6110",
+                  "text": "台中銀",
+                  "selected": false
+                },
+                {
+                  "value": "7120",
+                  "text": "台安",
+                  "selected": false
+                },
+                {
+                  "value": "9B00",
+                  "text": "台新",
+                  "selected": false
+                },
+                {
+                  "value": "3000",
+                  "text": "台新銀",
+                  "selected": false
+                },
+                {
+                  "value": "1090",
+                  "text": "台灣工銀",
+                  "selected": false
+                },
+                {
+                  "value": "8910",
+                  "text": "台灣巴克萊",
+                  "selected": false
+                },
+                {
+                  "value": "1110",
+                  "text": "台灣企銀",
+                  "selected": false
+                },
+                {
+                  "value": "1470",
+                  "text": "台灣摩根士丹利",
+                  "selected": false
+                },
+                {
+                  "value": "6450",
+                  "text": "永全",
+                  "selected": false
+                },
+                {
+                  "value": "5600",
+                  "text": "永興",
+                  "selected": false
+                },
+                {
+                  "value": "9A00",
+                  "text": "永豐金",
+                  "selected": false
+                },
+                {
+                  "value": "8840",
+                  "text": "玉山",
+                  "selected": false
+                },
+                {
+                  "value": "7080",
+                  "text": "石橋",
+                  "selected": false
+                },
+                {
+                  "value": "6380",
+                  "text": "光和",
+                  "selected": false
+                },
+                {
+                  "value": "7000",
+                  "text": "兆豐",
+                  "selected": false
+                },
+                {
+                  "value": "1020",
+                  "text": "合庫",
+                  "selected": false
+                },
+                {
+                  "value": "8380",
+                  "text": "安泰",
+                  "selected": false
+                },
+                {
+                  "value": "1260",
+                  "text": "宏遠",
+                  "selected": false
+                },
+                {
+                  "value": "2180",
+                  "text": "亞東",
+                  "selected": false
+                },
+                {
+                  "value": "8490",
+                  "text": "京城",
+                  "selected": false
+                },
+                {
+                  "value": "6660",
+                  "text": "和興",
+                  "selected": false
+                },
+                {
+                  "value": "8900",
+                  "text": "法銀巴黎",
+                  "selected": false
+                },
+                {
+                  "value": "8700",
+                  "text": "花旗",
+                  "selected": false
+                },
+                {
+                  "value": "1590",
+                  "text": "花旗環球",
+                  "selected": false
+                },
+                {
+                  "value": "7690",
+                  "text": "金興",
+                  "selected": false
+                },
+                {
+                  "value": "5860",
+                  "text": "盈溢",
+                  "selected": false
+                },
+                {
+                  "value": "5260",
+                  "text": "美好",
+                  "selected": false
+                },
+                {
+                  "value": "1440",
+                  "text": "美林",
+                  "selected": false
+                },
+                {
+                  "value": "1480",
+                  "text": "美商高盛",
+                  "selected": false
+                },
+                {
+                  "value": "7030",
+                  "text": "致和",
+                  "selected": false
+                },
+                {
+                  "value": "8960",
+                  "text": "香港上海匯豐",
+                  "selected": false
+                },
+                {
+                  "value": "5320",
+                  "text": "高橋",
+                  "selected": false
+                },
+                {
+                  "value": "8880",
+                  "text": "國泰",
+                  "selected": false
+                },
+                {
+                  "value": "7790",
+                  "text": "國票",
+                  "selected": false
+                },
+                {
+                  "value": "8450",
+                  "text": "康和",
+                  "selected": false
+                },
+                {
+                  "value": "5380",
+                  "text": "第一金",
+                  "selected": false
+                },
+                {
+                  "value": "5850",
+                  "text": "統一",
+                  "selected": false
+                },
+                {
+                  "value": "9200",
+                  "text": "凱基",
+                  "selected": false
+                },
+                {
+                  "value": "9600",
+                  "text": "富邦",
+                  "selected": false
+                },
+                {
+                  "value": "7530",
+                  "text": "富順",
+                  "selected": false
+                },
+                {
+                  "value": "1570",
+                  "text": "港商法國興業(停)",
+                  "selected": false
+                },
+                {
+                  "value": "1560",
+                  "text": "港商野村",
+                  "selected": false
+                },
+                {
+                  "value": "1360",
+                  "text": "港商麥格理",
+                  "selected": false
+                },
+                {
+                  "value": "1530",
+                  "text": "港商德意志(停)",
+                  "selected": false
+                },
+                {
+                  "value": "1660",
+                  "text": "港商聯昌",
+                  "selected": false
+                },
+                {
+                  "value": "1400",
+                  "text": "港商蘇皇",
+                  "selected": false
+                },
+                {
+                  "value": "6640",
+                  "text": "渣打商銀",
+                  "selected": false
+                },
+                {
+                  "value": "9300",
+                  "text": "華南永昌",
+                  "selected": false
+                },
+                {
+                  "value": "8710",
+                  "text": "陽信",
+                  "selected": false
+                },
+                {
+                  "value": "1650",
+                  "text": "新加坡商瑞銀",
+                  "selected": false
+                },
+                {
+                  "value": "8560",
+                  "text": "新光",
+                  "selected": false
+                },
+                {
+                  "value": "6210",
+                  "text": "新百王",
+                  "selected": false
+                },
+                {
+                  "value": "8690",
+                  "text": "新壽",
+                  "selected": false
+                },
+                {
+                  "value": "1520",
+                  "text": "瑞士信貸(停)",
+                  "selected": false
+                },
+                {
+                  "value": "8660",
+                  "text": "萬通(停)",
+                  "selected": false
+                },
+                {
+                  "value": "9100",
+                  "text": "群益金鼎",
+                  "selected": false
+                },
+                {
+                  "value": "2210",
+                  "text": "群益期貨",
+                  "selected": false
+                },
+                {
+                  "value": "1230",
+                  "text": "彰銀",
+                  "selected": false
+                },
+                {
+                  "value": "6480",
+                  "text": "福邦",
+                  "selected": false
+                },
+                {
+                  "value": "6950",
+                  "text": "福勝",
+                  "selected": false
+                },
+                {
+                  "value": "1040",
+                  "text": "臺銀",
+                  "selected": false
+                },
+                {
+                  "value": "6910",
+                  "text": "德信",
+                  "selected": false
+                },
+                {
+                  "value": "8440",
+                  "text": "摩根大通",
+                  "selected": false
+                },
+                {
+                  "value": "8580",
+                  "text": "聯邦商銀",
+                  "selected": false
+                },
+                {
+                  "value": "5500",
+                  "text": "豐銀",
+                  "selected": false
+                },
+                {
+                  "value": "7900",
+                  "text": "豐德",
+                  "selected": false
+                }
+              ]
+            },
+            {
+              "tagName": "SELECT",
+              "type": "select-one",
+              "name": "sel_BrokerBranch",
+              "id": "",
+              "value": "6010",
+              "onclick": null,
+              "onchange": "javascript:GoPage(g_FormObj);",
+              "options": [
+                {
+                  "value": "6010",
+                  "text": "(牛牛牛)亞證券",
+                  "selected": true
+                },
+                {
+                  "value": "6012",
+                  "text": "(牛牛牛)亞-網路",
+                  "selected": false
+                },
+                {
+                  "value": "0036003000310064",
+                  "text": "(牛牛牛)亞-鑫豐",
+                  "selected": false
+                }
+              ]
+            },
+            {
+              "tagName": "SELECT",
+              "type": "select-one",
+              "name": "D",
+              "id": "",
+              "value": "1",
+              "onclick": null,
+              "onchange": "goA();",
+              "options": [
+                {
+                  "value": "0",
+                  "text": "請選擇",
+                  "selected": false
+                },
+                {
+                  "value": "1",
+                  "text": "近一日",
+                  "selected": true
+                },
+                {
+                  "value": "2",
+                  "text": "近五日",
+                  "selected": false
+                },
+                {
+                  "value": "3",
+                  "text": "近十日",
+                  "selected": false
+                },
+                {
+                  "value": "4",
+                  "text": "近20日",
+                  "selected": false
+                },
+                {
+                  "value": "5",
+                  "text": "近40日",
+                  "selected": false
+                },
+                {
+                  "value": "6",
+                  "text": "近60日",
+                  "selected": false
+                },
+                {
+                  "value": "7",
+                  "text": "近120日",
+                  "selected": false
+                },
+                {
+                  "value": "8",
+                  "text": "近240日",
+                  "selected": false
+                }
+              ]
+            },
+            {
+              "tagName": "SELECT",
+              "type": "select-one",
+              "name": "Y2",
+              "id": "",
+              "value": "2026",
+              "onclick": null,
+              "onchange": "javascript:SetMonthDate(document.F.Y2,document.F.M2,document.F.D2);",
+              "options": [
+                {
+                  "value": "2025",
+                  "text": "114",
+                  "selected": false
+                },
+                {
+                  "value": "2026",
+                  "text": "115",
+                  "selected": true
+                }
+              ]
+            },
+            {
+              "tagName": "SELECT",
+              "type": "select-one",
+              "name": "M2",
+              "id": "",
+              "value": "8",
+              "onclick": null,
+              "onchange": "javascript:SetMonthDate(document.F.Y2,document.F.M2,document.F.D2);",
+              "options": [
+                {
+                  "value": "1",
+                  "text": "1",
+                  "selected": false
+                },
+                {
+                  "value": "2",
+                  "text": "2",
+                  "selected": false
+                },
+                {
+                  "value": "3",
+                  "text": "3",
+                  "selected": false
+                },
+                {
+                  "value": "4",
+                  "text": "4",
+                  "selected": false
+                },
+                {
+                  "value": "5",
+                  "text": "5",
+                  "selected": false
+                },
+                {
+                  "value": "6",
+                  "text": "6",
+                  "selected": false
+                },
+                {
+                  "value": "7",
+                  "text": "7",
+                  "selected": false
+                },
+                {
+                  "value": "8",
+                  "text": "8",
+                  "selected": true
+                }
+              ]
+            },
+            {
+              "tagName": "SELECT",
+              "type": "select-one",
+              "name": "D2",
+              "id": "",
+              "value": "7",
+              "onclick": null,
+              "onchange": null,
+              "options": [
+                {
+                  "value": "1",
+                  "text": "1",
+                  "selected": false
+                },
+                {
+                  "value": "2",
+                  "text": "2",
+                  "selected": false
+                },
+                {
+                  "value": "3",
+                  "text": "3",
+                  "selected": false
+                },
+                {
+                  "value": "4",
+                  "text": "4",
+                  "selected": false
+                },
+                {
+                  "value": "5",
+                  "text": "5",
+                  "selected": false
+                },
+                {
+                  "value": "6",
+                  "text": "6",
+                  "selected": false
+                },
+                {
+                  "value": "7",
+                  "text": "7",
+                  "selected": true
+                },
+                {
+                  "value": "8",
+                  "text": "8",
+                  "selected": false
+                },
+                {
+                  "value": "9",
+                  "text": "9",
+                  "selected": false
+                },
+                {
+                  "value": "10",
+                  "text": "10",
+                  "selected": false
+                }
+              ]
+            },
+            {
+              "tagName": "SELECT",
+              "type": "select-one",
+              "name": "Y1",
+              "id": "",
+              "value": "2026",
+              "onclick": null,
+              "onchange": "javascript:SetMonthDate(document.F.Y1,document.F.M1,document.F.D1);",
+              "options": [
+                {
+                  "value": "2025",
+                  "text": "114",
+                  "selected": false
+                },
+                {
+                  "value": "2026",
+                  "text": "115",
+                  "selected": true
+                }
+              ]
+            },
+            {
+              "tagName": "SELECT",
+              "type": "select-one",
+              "name": "M1",
+              "id": "",
+              "value": "8",
+              "onclick": null,
+              "onchange": "javascript:SetMonthDate(document.F.Y1,document.F.M1,document.F.D1);",
+              "options": [
+                {
+                  "value": "1",
+                  "text": "1",
+                  "selected": false
+                },
+                {
+                  "value": "2",
+                  "text": "2",
+                  "selected": false
+                },
+                {
+                  "value": "3",
+                  "text": "3",
+                  "selected": false
+                },
+                {
+                  "value": "4",
+                  "text": "4",
+                  "selected": false
+                },
+                {
+                  "value": "5",
+                  "text": "5",
+                  "selected": false
+                },
+                {
+                  "value": "6",
+                  "text": "6",
+                  "selected": false
+                },
+                {
+                  "value": "7",
+                  "text": "7",
+                  "selected": false
+                },
+                {
+                  "value": "8",
+                  "text": "8",
+                  "selected": true
+                }
+              ]
+            },
+            {
+              "tagName": "SELECT",
+              "type": "select-one",
+              "name": "D1",
+              "id": "",
+              "value": "7",
+              "onclick": null,
+              "onchange": null,
+              "options": [
+                {
+                  "value": "1",
+                  "text": "1",
+                  "selected": false
+                },
+                {
+                  "value": "2",
+                  "text": "2",
+                  "selected": false
+                },
+                {
+                  "value": "3",
+                  "text": "3",
+                  "selected": false
+                },
+                {
+                  "value": "4",
+                  "text": "4",
+                  "selected": false
+                },
+                {
+                  "value": "5",
+                  "text": "5",
+                  "selected": false
+                },
+                {
+                  "value": "6",
+                  "text": "6",
+                  "selected": false
+                },
+                {
+                  "value": "7",
+                  "text": "7",
+                  "selected": true
+                },
+                {
+                  "value": "8",
+                  "text": "8",
+                  "selected": false
+                },
+                {
+                  "value": "9",
+                  "text": "9",
+                  "selected": false
+                },
+                {
+                  "value": "10",
+                  "text": "10",
+                  "selected": false
+                }
+              ]
+            },
+            {
+              "tagName": "INPUT",
+              "type": "hidden",
+              "name": "bDate",
+              "id": "",
+              "value": "",
+              "onclick": null,
+              "onchange": null
+            },
+            {
+              "tagName": "INPUT",
+              "type": "hidden",
+              "name": "eDate",
+              "id": "",
+              "value": "",
+              "onclick": null,
+              "onchange": null
+            },
+            {
+              "tagName": "INPUT",
+              "type": "button",
+              "name": "BB",
+              "id": "",
+              "value": "查詢",
+              "onclick": "javascript:goC();",
+              "onchange": null
+            }
+          ]
+        }
+      ],
+      "body_head": "  個股區\n所屬產業\n公司互動\n動態報導\n個股速覽\n公開說明書\n個股比較\n基本分析\n籌碼分析\n財務分析\n技術分析\n台積電(2330)主力進出比較圖\n總表 單一\n(牛牛牛)亞證券\n口袋證券\n土銀\n大和國泰\n大昌\n大展\n大鼎(停)\n中國信託\n中農\n元大\n元大期貨\n日茂\n日進\n北城\n台中銀\n台安\n台新\n台新銀\n台灣工銀\n台灣巴克萊\n台灣企銀\n台灣摩根士丹利\n永全\n永興\n永豐金\n玉山\n石橋\n光和\n兆豐\n合庫\n安泰\n宏遠\n亞東\n京城\n和興\n法銀巴黎\n花旗\n花旗環球\n金興\n盈溢\n美好\n美林\n美商高盛\n致和\n香港上海匯豐\n高橋\n國泰\n國票\n康和\n第一金\n統一\n凱基\n富邦\n富順\n港商法國興業(停)\n港商野村\n港商麥格理\n港商德意志(停)\n港商聯昌\n港商蘇皇\n渣打商銀\n華南永昌\n陽信\n新加坡商瑞銀\n新光\n新百王\n新壽\n瑞士信貸(停)\n萬通(停)\n群益金鼎\n群益期貨\n彰銀\n福邦\n福勝\n臺銀\n德信\n摩根大通\n聯邦商銀\n豐銀\n豐德\n豐興\n寶盛\n(牛牛牛)亞證券\n(牛牛牛)亞-網路\n(牛牛牛)亞-鑫豐\n8/07 2,370元 (台積電股價)\n8/07 -788張 (主力買賣超)\n台積電(2330) 券商分點-進出明細\n單位：張　最後更新日：2026/08/07\n請選擇\n近一日\n近五日\n近十日\n近20日\n近40日\n近60日\n近120日\n近240日\n自設區間： 從　\n \n114\n115\n年 \n \n1\n2\n3\n4\n5\n6\n7\n8\n月 \n \n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n日 ～ \n \n114\n115\n年 \n \n1\n2\n3\n4\n5\n6\n7\n8\n月 \n \n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n日\n買超 賣超\n買超券商 買進 賣出 買超 佔成交比重 賣超券商 買進 賣出 賣超 佔成交比重\n摩根大通 3,110 970 2,140 9.36% 台灣摩根士丹利 641 2,846 2,205 9.64%\n港商麥格理 1,933 279 1,654 7.23% 大和國泰 1 1,998 1,997 8.73%\n新加坡商瑞銀 1,185 549 636 2.78% 美商高盛 464 2,292 1,828 7.99%\n凱基 632 51 581 2.54% 美林 689 1,364 675 2.95%\n永豐金-匯立 635 97 538 2.35% 港商野村 337 846 509 2.23%\n花旗環球 2,483 2,011 472 2.06% 富邦證券 434 694 260 1.14%\n統一 596 153 443 1.94% 兆豐證券 21 273 252 1.1%\n元大證券 1,635 1,344 291 1.27% 宏遠證券 37 273 236 1.03%\n永豐金證券 342 165 177 0.77% 群益金鼎-北高雄 3 212 209 0.91%\n國泰證券 392 232 160 0.7% 凱基-站前 20 102 82 0.36%\n德信 151 1 150 0.66% 第一金-高雄 3 63 60 0.26%\n香港上海匯豐 383 238 145 0.63% 群益金鼎-敦南 8 60 52 0.23%\n中國信託 127 12 115 0.5% 永豐金-天母 2 53 51 0.22%\n凱基-台北 868 754 114 0.5% 凱基-信義 2 50 48 0.21%\n華南永昌-世貿 106 2 104 0.45% 永豐金-萬盛 8 55 47 0.21%\n合計買超張數 7,724 合計賣超張數 8,512\n平均買超成本 2,374.02 平均賣超成本 2,369.99\n【註1】合計買超或賣超，為上述家數合計。\n【註2】平均買超或賣超成本，為上述家數合計買賣超金額/上述家數合計買賣超張數。",
+      "links": [
+        {
+          "text": "摩根大通",
+          "href": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=8440&BHID=8440"
+        },
+        {
+          "text": "台灣摩根士丹利",
+          "href": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=1470&BHID=1470"
+        },
+        {
+          "text": "港商麥格理",
+          "href": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=1360&BHID=1360"
+        },
+        {
+          "text": "大和國泰",
+          "href": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=8890&BHID=8890"
+        },
+        {
+          "text": "新加坡商瑞銀",
+          "href": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=1650&BHID=1650"
+        },
+        {
+          "text": "美商高盛",
+          "href": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=1480&BHID=1480"
+        },
+        {
+          "text": "凱基",
+          "href": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=9200&BHID=9200"
+        },
+        {
+          "text": "美林",
+          "href": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=1440&BHID=1440"
+        },
+        {
+          "text": "永豐金-匯立",
+          "href": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=0039004100380031&BHID=9A00"
+        },
+        {
+          "text": "港商野村",
+          "href": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=1560&BHID=1560"
+        },
+        {
+          "text": "花旗環球",
+          "href": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=1590&BHID=1590"
+        },
+        {
+          "text": "富邦證券",
+          "href": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=9600&BHID=9600"
+        },
+        {
+          "text": "統一",
+          "href": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=5850&BHID=5850"
+        },
+        {
+          "text": "兆豐證券",
+          "href": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=7000&BHID=7000"
+        },
+        {
+          "text": "元大證券",
+          "href": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=9800&BHID=9800"
+        },
+        {
+          "text": "宏遠證券",
+          "href": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=1260&BHID=1260"
+        },
+        {
+          "text": "永豐金證券",
+          "href": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=0039004100300030&BHID=9A00"
+        },
+        {
+          "text": "群益金鼎-北高雄",
+          "href": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=0039003100330052&BHID=9100"
+        },
+        {
+          "text": "國泰證券",
+          "href": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=8880&BHID=8880"
+        },
+        {
+          "text": "凱基-站前",
+          "href": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=0039003200300046&BHID=9200"
+        },
+        {
+          "text": "德信",
+          "href": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=6910&BHID=6910"
+        },
+        {
+          "text": "第一金-高雄",
+          "href": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=5383&BHID=5380"
+        },
+        {
+          "text": "香港上海匯豐",
+          "href": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=8960&BHID=8960"
+        },
+        {
+          "text": "群益金鼎-敦南",
+          "href": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=9101&BHID=9100"
+        },
+        {
+          "text": "中國信託",
+          "href": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=6160&BHID=6160"
+        },
+        {
+          "text": "永豐金-天母",
+          "href": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=0039004100390047&BHID=9A00"
+        },
+        {
+          "text": "凱基-台北",
+          "href": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=9268&BHID=9200"
+        },
+        {
+          "text": "凱基-信義",
+          "href": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=9216&BHID=9200"
+        },
+        {
+          "text": "華南永昌-世貿",
+          "href": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=9334&BHID=9300"
+        },
+        {
+          "text": "永豐金-萬盛",
+          "href": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=0039004100390032&BHID=9A00"
+        }
+      ],
+      "script_srcs": [
+        "https://5850web.moneydj.com/z/js/zbrokerjs.djjs"
+      ]
+    },
+    {
+      "requested": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&BHID=1470&b=1470&C=1",
+      "current_url": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&BHID=1470&b=1470&C=1",
+      "title": "個股主力券商-2330",
+      "forms": [
+        {
+          "name": "F",
+          "id": "",
+          "method": "get",
+          "action": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&BHID=1470&b=1470&C=1",
+          "onsubmit": "return false;",
+          "inputs": [
+            {
+              "tagName": "INPUT",
+              "type": "radio",
+              "name": "radio1",
+              "id": "",
+              "value": "on",
+              "onclick": "javascript:window.open('/z/zc/zco/zco.djhtm?a=2330','_self')",
+              "onchange": null
+            },
+            {
+              "tagName": "INPUT",
+              "type": "radio",
+              "name": "radio1",
+              "id": "",
+              "value": "on",
+              "onclick": null,
+              "onchange": null
+            },
+            {
+              "tagName": "SELECT",
+              "type": "select-one",
+              "name": "sel_Broker",
+              "id": "",
+              "value": "1470",
+              "onclick": null,
+              "onchange": "javascript:changeSelect2()",
+              "options": [
+                {
+                  "value": "6010",
+                  "text": "(牛牛牛)亞證券",
+                  "selected": false
+                },
+                {
+                  "value": "6620",
+                  "text": "口袋證券",
+                  "selected": false
+                },
+                {
+                  "value": "1030",
+                  "text": "土銀",
+                  "selected": false
+                },
+                {
+                  "value": "8890",
+                  "text": "大和國泰",
+                  "selected": false
+                },
+                {
+                  "value": "6460",
+                  "text": "大昌",
+                  "selected": false
+                },
+                {
+                  "value": "5050",
+                  "text": "大展",
+                  "selected": false
+                },
+                {
+                  "value": "8770",
+                  "text": "大鼎(停)",
+                  "selected": false
+                },
+                {
+                  "value": "6160",
+                  "text": "中國信託",
+                  "selected": false
+                },
+                {
+                  "value": "8520",
+                  "text": "中農",
+                  "selected": false
+                },
+                {
+                  "value": "9800",
+                  "text": "元大",
+                  "selected": false
+                },
+                {
+                  "value": "2200",
+                  "text": "元大期貨",
+                  "selected": false
+                },
+                {
+                  "value": "5960",
+                  "text": "日茂",
+                  "selected": false
+                },
+                {
+                  "value": "5660",
+                  "text": "日進",
+                  "selected": false
+                },
+                {
+                  "value": "7750",
+                  "text": "北城",
+                  "selected": false
+                },
+                {
+                  "value": "6110",
+                  "text": "台中銀",
+                  "selected": false
+                },
+                {
+                  "value": "7120",
+                  "text": "台安",
+                  "selected": false
+                },
+                {
+                  "value": "9B00",
+                  "text": "台新",
+                  "selected": false
+                },
+                {
+                  "value": "3000",
+                  "text": "台新銀",
+                  "selected": false
+                },
+                {
+                  "value": "1090",
+                  "text": "台灣工銀",
+                  "selected": false
+                },
+                {
+                  "value": "8910",
+                  "text": "台灣巴克萊",
+                  "selected": false
+                },
+                {
+                  "value": "1110",
+                  "text": "台灣企銀",
+                  "selected": false
+                },
+                {
+                  "value": "1470",
+                  "text": "台灣摩根士丹利",
+                  "selected": true
+                },
+                {
+                  "value": "6450",
+                  "text": "永全",
+                  "selected": false
+                },
+                {
+                  "value": "5600",
+                  "text": "永興",
+                  "selected": false
+                },
+                {
+                  "value": "9A00",
+                  "text": "永豐金",
+                  "selected": false
+                },
+                {
+                  "value": "8840",
+                  "text": "玉山",
+                  "selected": false
+                },
+                {
+                  "value": "7080",
+                  "text": "石橋",
+                  "selected": false
+                },
+                {
+                  "value": "6380",
+                  "text": "光和",
+                  "selected": false
+                },
+                {
+                  "value": "7000",
+                  "text": "兆豐",
+                  "selected": false
+                },
+                {
+                  "value": "1020",
+                  "text": "合庫",
+                  "selected": false
+                },
+                {
+                  "value": "8380",
+                  "text": "安泰",
+                  "selected": false
+                },
+                {
+                  "value": "1260",
+                  "text": "宏遠",
+                  "selected": false
+                },
+                {
+                  "value": "2180",
+                  "text": "亞東",
+                  "selected": false
+                },
+                {
+                  "value": "8490",
+                  "text": "京城",
+                  "selected": false
+                },
+                {
+                  "value": "6660",
+                  "text": "和興",
+                  "selected": false
+                },
+                {
+                  "value": "8900",
+                  "text": "法銀巴黎",
+                  "selected": false
+                },
+                {
+                  "value": "8700",
+                  "text": "花旗",
+                  "selected": false
+                },
+                {
+                  "value": "1590",
+                  "text": "花旗環球",
+                  "selected": false
+                },
+                {
+                  "value": "7690",
+                  "text": "金興",
+                  "selected": false
+                },
+                {
+                  "value": "5860",
+                  "text": "盈溢",
+                  "selected": false
+                },
+                {
+                  "value": "5260",
+                  "text": "美好",
+                  "selected": false
+                },
+                {
+                  "value": "1440",
+                  "text": "美林",
+                  "selected": false
+                },
+                {
+                  "value": "1480",
+                  "text": "美商高盛",
+                  "selected": false
+                },
+                {
+                  "value": "7030",
+                  "text": "致和",
+                  "selected": false
+                },
+                {
+                  "value": "8960",
+                  "text": "香港上海匯豐",
+                  "selected": false
+                },
+                {
+                  "value": "5320",
+                  "text": "高橋",
+                  "selected": false
+                },
+                {
+                  "value": "8880",
+                  "text": "國泰",
+                  "selected": false
+                },
+                {
+                  "value": "7790",
+                  "text": "國票",
+                  "selected": false
+                },
+                {
+                  "value": "8450",
+                  "text": "康和",
+                  "selected": false
+                },
+                {
+                  "value": "5380",
+                  "text": "第一金",
+                  "selected": false
+                },
+                {
+                  "value": "5850",
+                  "text": "統一",
+                  "selected": false
+                },
+                {
+                  "value": "9200",
+                  "text": "凱基",
+                  "selected": false
+                },
+                {
+                  "value": "9600",
+                  "text": "富邦",
+                  "selected": false
+                },
+                {
+                  "value": "7530",
+                  "text": "富順",
+                  "selected": false
+                },
+                {
+                  "value": "1570",
+                  "text": "港商法國興業(停)",
+                  "selected": false
+                },
+                {
+                  "value": "1560",
+                  "text": "港商野村",
+                  "selected": false
+                },
+                {
+                  "value": "1360",
+                  "text": "港商麥格理",
+                  "selected": false
+                },
+                {
+                  "value": "1530",
+                  "text": "港商德意志(停)",
+                  "selected": false
+                },
+                {
+                  "value": "1660",
+                  "text": "港商聯昌",
+                  "selected": false
+                },
+                {
+                  "value": "1400",
+                  "text": "港商蘇皇",
+                  "selected": false
+                },
+                {
+                  "value": "6640",
+                  "text": "渣打商銀",
+                  "selected": false
+                },
+                {
+                  "value": "9300",
+                  "text": "華南永昌",
+                  "selected": false
+                },
+                {
+                  "value": "8710",
+                  "text": "陽信",
+                  "selected": false
+                },
+                {
+                  "value": "1650",
+                  "text": "新加坡商瑞銀",
+                  "selected": false
+                },
+                {
+                  "value": "8560",
+                  "text": "新光",
+                  "selected": false
+                },
+                {
+                  "value": "6210",
+                  "text": "新百王",
+                  "selected": false
+                },
+                {
+                  "value": "8690",
+                  "text": "新壽",
+                  "selected": false
+                },
+                {
+                  "value": "1520",
+                  "text": "瑞士信貸(停)",
+                  "selected": false
+                },
+                {
+                  "value": "8660",
+                  "text": "萬通(停)",
+                  "selected": false
+                },
+                {
+                  "value": "9100",
+                  "text": "群益金鼎",
+                  "selected": false
+                },
+                {
+                  "value": "2210",
+                  "text": "群益期貨",
+                  "selected": false
+                },
+                {
+                  "value": "1230",
+                  "text": "彰銀",
+                  "selected": false
+                },
+                {
+                  "value": "6480",
+                  "text": "福邦",
+                  "selected": false
+                },
+                {
+                  "value": "6950",
+                  "text": "福勝",
+                  "selected": false
+                },
+                {
+                  "value": "1040",
+                  "text": "臺銀",
+                  "selected": false
+                },
+                {
+                  "value": "6910",
+                  "text": "德信",
+                  "selected": false
+                },
+                {
+                  "value": "8440",
+                  "text": "摩根大通",
+                  "selected": false
+                },
+                {
+                  "value": "8580",
+                  "text": "聯邦商銀",
+                  "selected": false
+                },
+                {
+                  "value": "5500",
+                  "text": "豐銀",
+                  "selected": false
+                },
+                {
+                  "value": "7900",
+                  "text": "豐德",
+                  "selected": false
+                }
+              ]
+            },
+            {
+              "tagName": "SELECT",
+              "type": "select-one",
+              "name": "sel_BrokerBranch",
+              "id": "",
+              "value": "1470",
+              "onclick": null,
+              "onchange": "javascript:GoPage(g_FormObj);",
+              "options": [
+                {
+                  "value": "1470",
+                  "text": "台灣摩根士丹利",
+                  "selected": true
+                }
+              ]
+            },
+            {
+              "tagName": "SELECT",
+              "type": "select-one",
+              "name": "D",
+              "id": "",
+              "value": "1",
+              "onclick": null,
+              "onchange": "goA();",
+              "options": [
+                {
+                  "value": "0",
+                  "text": "請選擇",
+                  "selected": false
+                },
+                {
+                  "value": "1",
+                  "text": "近20日",
+                  "selected": true
+                },
+                {
+                  "value": "2",
+                  "text": "近40日",
+                  "selected": false
+                },
+                {
+                  "value": "3",
+                  "text": "近60日",
+                  "selected": false
+                }
+              ]
+            },
+            {
+              "tagName": "SELECT",
+              "type": "select-one",
+              "name": "Y2",
+              "id": "",
+              "value": "2026",
+              "onclick": null,
+              "onchange": "javascript:SetMonthDate(document.F.Y2,document.F.M2,document.F.D2);",
+              "options": [
+                {
+                  "value": "2025",
+                  "text": "114",
+                  "selected": false
+                },
+                {
+                  "value": "2026",
+                  "text": "115",
+                  "selected": true
+                }
+              ]
+            },
+            {
+              "tagName": "SELECT",
+              "type": "select-one",
+              "name": "M2",
+              "id": "",
+              "value": "6",
+              "onclick": null,
+              "onchange": "javascript:SetMonthDate(document.F.Y2,document.F.M2,document.F.D2);",
+              "options": [
+                {
+                  "value": "1",
+                  "text": "1",
+                  "selected": false
+                },
+                {
+                  "value": "2",
+                  "text": "2",
+                  "selected": false
+                },
+                {
+                  "value": "3",
+                  "text": "3",
+                  "selected": false
+                },
+                {
+                  "value": "4",
+                  "text": "4",
+                  "selected": false
+                },
+                {
+                  "value": "5",
+                  "text": "5",
+                  "selected": false
+                },
+                {
+                  "value": "6",
+                  "text": "6",
+                  "selected": true
+                },
+                {
+                  "value": "7",
+                  "text": "7",
+                  "selected": false
+                },
+                {
+                  "value": "8",
+                  "text": "8",
+                  "selected": false
+                }
+              ]
+            },
+            {
+              "tagName": "SELECT",
+              "type": "select-one",
+              "name": "D2",
+              "id": "",
+              "value": "26",
+              "onclick": null,
+              "onchange": null,
+              "options": [
+                {
+                  "value": "1",
+                  "text": "1",
+                  "selected": false
+                },
+                {
+                  "value": "2",
+                  "text": "2",
+                  "selected": false
+                },
+                {
+                  "value": "3",
+                  "text": "3",
+                  "selected": false
+                },
+                {
+                  "value": "4",
+                  "text": "4",
+                  "selected": false
+                },
+                {
+                  "value": "5",
+                  "text": "5",
+                  "selected": false
+                },
+                {
+                  "value": "6",
+                  "text": "6",
+                  "selected": false
+                },
+                {
+                  "value": "7",
+                  "text": "7",
+                  "selected": false
+                },
+                {
+                  "value": "8",
+                  "text": "8",
+                  "selected": false
+                },
+                {
+                  "value": "9",
+                  "text": "9",
+                  "selected": false
+                },
+                {
+                  "value": "10",
+                  "text": "10",
+                  "selected": false
+                },
+                {
+                  "value": "11",
+                  "text": "11",
+                  "selected": false
+                },
+                {
+                  "value": "12",
+                  "text": "12",
+                  "selected": false
+                },
+                {
+                  "value": "13",
+                  "text": "13",
+                  "selected": false
+                },
+                {
+                  "value": "14",
+                  "text": "14",
+                  "selected": false
+                },
+                {
+                  "value": "15",
+                  "text": "15",
+                  "selected": false
+                },
+                {
+                  "value": "16",
+                  "text": "16",
+                  "selected": false
+                },
+                {
+                  "value": "17",
+                  "text": "17",
+                  "selected": false
+                },
+                {
+                  "value": "18",
+                  "text": "18",
+                  "selected": false
+                },
+                {
+                  "value": "19",
+                  "text": "19",
+                  "selected": false
+                },
+                {
+                  "value": "20",
+                  "text": "20",
+                  "selected": false
+                },
+                {
+                  "value": "21",
+                  "text": "21",
+                  "selected": false
+                },
+                {
+                  "value": "22",
+                  "text": "22",
+                  "selected": false
+                },
+                {
+                  "value": "23",
+                  "text": "23",
+                  "selected": false
+                },
+                {
+                  "value": "24",
+                  "text": "24",
+                  "selected": false
+                },
+                {
+                  "value": "25",
+                  "text": "25",
+                  "selected": false
+                },
+                {
+                  "value": "26",
+                  "text": "26",
+                  "selected": true
+                },
+                {
+                  "value": "27",
+                  "text": "27",
+                  "selected": false
+                },
+                {
+                  "value": "28",
+                  "text": "28",
+                  "selected": false
+                },
+                {
+                  "value": "29",
+                  "text": "29",
+                  "selected": false
+                },
+                {
+                  "value": "30",
+                  "text": "30",
+                  "selected": false
+                }
+              ]
+            },
+            {
+              "tagName": "SELECT",
+              "type": "select-one",
+              "name": "Y1",
+              "id": "",
+              "value": "2026",
+              "onclick": null,
+              "onchange": "javascript:SetMonthDate(document.F.Y1,document.F.M1,document.F.D1);",
+              "options": [
+                {
+                  "value": "2025",
+                  "text": "114",
+                  "selected": false
+                },
+                {
+                  "value": "2026",
+                  "text": "115",
+                  "selected": true
+                }
+              ]
+            },
+            {
+              "tagName": "SELECT",
+              "type": "select-one",
+              "name": "M1",
+              "id": "",
+              "value": "8",
+              "onclick": null,
+              "onchange": "javascript:SetMonthDate(document.F.Y1,document.F.M1,document.F.D1);",
+              "options": [
+                {
+                  "value": "1",
+                  "text": "1",
+                  "selected": false
+                },
+                {
+                  "value": "2",
+                  "text": "2",
+                  "selected": false
+                },
+                {
+                  "value": "3",
+                  "text": "3",
+                  "selected": false
+                },
+                {
+                  "value": "4",
+                  "text": "4",
+                  "selected": false
+                },
+                {
+                  "value": "5",
+                  "text": "5",
+                  "selected": false
+                },
+                {
+                  "value": "6",
+                  "text": "6",
+                  "selected": false
+                },
+                {
+                  "value": "7",
+                  "text": "7",
+                  "selected": false
+                },
+                {
+                  "value": "8",
+                  "text": "8",
+                  "selected": true
+                }
+              ]
+            },
+            {
+              "tagName": "SELECT",
+              "type": "select-one",
+              "name": "D1",
+              "id": "",
+              "value": "10",
+              "onclick": null,
+              "onchange": null,
+              "options": [
+                {
+                  "value": "1",
+                  "text": "1",
+                  "selected": false
+                },
+                {
+                  "value": "2",
+                  "text": "2",
+                  "selected": false
+                },
+                {
+                  "value": "3",
+                  "text": "3",
+                  "selected": false
+                },
+                {
+                  "value": "4",
+                  "text": "4",
+                  "selected": false
+                },
+                {
+                  "value": "5",
+                  "text": "5",
+                  "selected": false
+                },
+                {
+                  "value": "6",
+                  "text": "6",
+                  "selected": false
+                },
+                {
+                  "value": "7",
+                  "text": "7",
+                  "selected": false
+                },
+                {
+                  "value": "8",
+                  "text": "8",
+                  "selected": false
+                },
+                {
+                  "value": "9",
+                  "text": "9",
+                  "selected": false
+                },
+                {
+                  "value": "10",
+                  "text": "10",
+                  "selected": true
+                }
+              ]
+            },
+            {
+              "tagName": "INPUT",
+              "type": "hidden",
+              "name": "bDate",
+              "id": "",
+              "value": "",
+              "onclick": null,
+              "onchange": null
+            },
+            {
+              "tagName": "INPUT",
+              "type": "hidden",
+              "name": "eDate",
+              "id": "",
+              "value": "",
+              "onclick": null,
+              "onchange": null
+            },
+            {
+              "tagName": "INPUT",
+              "type": "button",
+              "name": "BB",
+              "id": "",
+              "value": "查詢",
+              "onclick": "javascript:goB();",
+              "onchange": null
+            }
+          ]
+        }
+      ],
+      "body_head": "  個股區\n所屬產業\n公司互動\n動態報導\n個股速覽\n公開說明書\n個股比較\n基本分析\n籌碼分析\n財務分析\n技術分析\n台灣摩根士丹利 對 台積電(2330)個股 單一券商歷史明細\n總表 單一\n(牛牛牛)亞證券\n口袋證券\n土銀\n大和國泰\n大昌\n大展\n大鼎(停)\n中國信託\n中農\n元大\n元大期貨\n日茂\n日進\n北城\n台中銀\n台安\n台新\n台新銀\n台灣工銀\n台灣巴克萊\n台灣企銀\n台灣摩根士丹利\n永全\n永興\n永豐金\n玉山\n石橋\n光和\n兆豐\n合庫\n安泰\n宏遠\n亞東\n京城\n和興\n法銀巴黎\n花旗\n花旗環球\n金興\n盈溢\n美好\n美林\n美商高盛\n致和\n香港上海匯豐\n高橋\n國泰\n國票\n康和\n第一金\n統一\n凱基\n富邦\n富順\n港商法國興業(停)\n港商野村\n港商麥格理\n港商德意志(停)\n港商聯昌\n港商蘇皇\n渣打商銀\n華南永昌\n陽信\n新加坡商瑞銀\n新光\n新百王\n新壽\n瑞士信貸(停)\n萬通(停)\n群益金鼎\n群益期貨\n彰銀\n福邦\n福勝\n臺銀\n德信\n摩根大通\n聯邦商銀\n豐銀\n豐德\n豐興\n寶盛\n台灣摩根士丹利\n8/07 2,370元 (台積電股價)\n8/07 -2,205張 (買賣超)\n進出明細表\n請選擇\n近20日\n近40日\n近60日\n自設區間： 從　\n \n114\n115\n年 \n \n1\n2\n3\n4\n5\n6\n7\n8\n月 \n \n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\n14\n15\n16\n17\n18\n19\n20\n21\n22\n23\n24\n25\n26\n27\n28\n29\n30\n日 ～ \n \n114\n115\n年 \n \n1\n2\n3\n4\n5\n6\n7\n8\n月 \n \n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n日\n日期 買進(張) 賣出(張) 買賣總額(張) 買賣超(張)\n2026/08/07 641 2,846 3,487 -2,205\n2026/08/06 1,091 1,361 2,452 -271\n2026/08/05 5,678 571 6,250 5,107\n2026/08/04 1,300 3,714 5,014 -2,414\n2026/08/03 1,143 8,710 9,853 -7,567\n2026/07/31 4,868 2,294 7,163 2,574\n2026/07/30 3,309 6,364 9,673 -3,054\n2026/07/29 2,257 10,388 12,645 -8,131\n2026/07/28 1,765 2,620 4,385 -855\n2026/07/27 3,348 2,948 6,296 400\n2026/07/24 485 2,304 2,789 -1,820\n2026/07/23 308 1,179 1,487 -870\n2026/07/22 1,730 1,741 3,470 -11\n2026/07/21 1,625 1,916 3,541 -291\n2026/07/20 1,801 7,372 9,173 -5,571\n2026/07/17 302 6,034 6,336 -5,732\n2026/07/16 525 3,387 3,912 -2,861\n2026/07/15 481 2,919 3,400 -2,438\n2026/07/14 1,136 2,369 3,505 -1,232\n2026/07/13 3,185 3,112 6,297 73\n期間累計買賣超張數： -37,169",
+      "links": [],
+      "script_srcs": [
+        "https://5850web.moneydj.com/z/js/zbrokerjs.djjs"
+      ]
+    },
+    {
+      "requested": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=1470&C=1",
+      "current_url": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=1470&C=1",
+      "title": "個股主力券商-2330",
+      "forms": [
+        {
+          "name": "F",
+          "id": "",
+          "method": "get",
+          "action": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&b=1470&C=1",
+          "onsubmit": "return false;",
+          "inputs": [
+            {
+              "tagName": "INPUT",
+              "type": "radio",
+              "name": "radio1",
+              "id": "",
+              "value": "on",
+              "onclick": "javascript:window.open('/z/zc/zco/zco.djhtm?a=2330','_self')",
+              "onchange": null
+            },
+            {
+              "tagName": "INPUT",
+              "type": "radio",
+              "name": "radio1",
+              "id": "",
+              "value": "on",
+              "onclick": null,
+              "onchange": null
+            },
+            {
+              "tagName": "SELECT",
+              "type": "select-one",
+              "name": "sel_Broker",
+              "id": "",
+              "value": "6010",
+              "onclick": null,
+              "onchange": "javascript:changeSelect2()",
+              "options": [
+                {
+                  "value": "6010",
+                  "text": "(牛牛牛)亞證券",
+                  "selected": true
+                },
+                {
+                  "value": "6620",
+                  "text": "口袋證券",
+                  "selected": false
+                },
+                {
+                  "value": "1030",
+                  "text": "土銀",
+                  "selected": false
+                },
+                {
+                  "value": "8890",
+                  "text": "大和國泰",
+                  "selected": false
+                },
+                {
+                  "value": "6460",
+                  "text": "大昌",
+                  "selected": false
+                },
+                {
+                  "value": "5050",
+                  "text": "大展",
+                  "selected": false
+                },
+                {
+                  "value": "8770",
+                  "text": "大鼎(停)",
+                  "selected": false
+                },
+                {
+                  "value": "6160",
+                  "text": "中國信託",
+                  "selected": false
+                },
+                {
+                  "value": "8520",
+                  "text": "中農",
+                  "selected": false
+                },
+                {
+                  "value": "9800",
+                  "text": "元大",
+                  "selected": false
+                },
+                {
+                  "value": "2200",
+                  "text": "元大期貨",
+                  "selected": false
+                },
+                {
+                  "value": "5960",
+                  "text": "日茂",
+                  "selected": false
+                },
+                {
+                  "value": "5660",
+                  "text": "日進",
+                  "selected": false
+                },
+                {
+                  "value": "7750",
+                  "text": "北城",
+                  "selected": false
+                },
+                {
+                  "value": "6110",
+                  "text": "台中銀",
+                  "selected": false
+                },
+                {
+                  "value": "7120",
+                  "text": "台安",
+                  "selected": false
+                },
+                {
+                  "value": "9B00",
+                  "text": "台新",
+                  "selected": false
+                },
+                {
+                  "value": "3000",
+                  "text": "台新銀",
+                  "selected": false
+                },
+                {
+                  "value": "1090",
+                  "text": "台灣工銀",
+                  "selected": false
+                },
+                {
+                  "value": "8910",
+                  "text": "台灣巴克萊",
+                  "selected": false
+                },
+                {
+                  "value": "1110",
+                  "text": "台灣企銀",
+                  "selected": false
+                },
+                {
+                  "value": "1470",
+                  "text": "台灣摩根士丹利",
+                  "selected": false
+                },
+                {
+                  "value": "6450",
+                  "text": "永全",
+                  "selected": false
+                },
+                {
+                  "value": "5600",
+                  "text": "永興",
+                  "selected": false
+                },
+                {
+                  "value": "9A00",
+                  "text": "永豐金",
+                  "selected": false
+                },
+                {
+                  "value": "8840",
+                  "text": "玉山",
+                  "selected": false
+                },
+                {
+                  "value": "7080",
+                  "text": "石橋",
+                  "selected": false
+                },
+                {
+                  "value": "6380",
+                  "text": "光和",
+                  "selected": false
+                },
+                {
+                  "value": "7000",
+                  "text": "兆豐",
+                  "selected": false
+                },
+                {
+                  "value": "1020",
+                  "text": "合庫",
+                  "selected": false
+                },
+                {
+                  "value": "8380",
+                  "text": "安泰",
+                  "selected": false
+                },
+                {
+                  "value": "1260",
+                  "text": "宏遠",
+                  "selected": false
+                },
+                {
+                  "value": "2180",
+                  "text": "亞東",
+                  "selected": false
+                },
+                {
+                  "value": "8490",
+                  "text": "京城",
+                  "selected": false
+                },
+                {
+                  "value": "6660",
+                  "text": "和興",
+                  "selected": false
+                },
+                {
+                  "value": "8900",
+                  "text": "法銀巴黎",
+                  "selected": false
+                },
+                {
+                  "value": "8700",
+                  "text": "花旗",
+                  "selected": false
+                },
+                {
+                  "value": "1590",
+                  "text": "花旗環球",
+                  "selected": false
+                },
+                {
+                  "value": "7690",
+                  "text": "金興",
+                  "selected": false
+                },
+                {
+                  "value": "5860",
+                  "text": "盈溢",
+                  "selected": false
+                },
+                {
+                  "value": "5260",
+                  "text": "美好",
+                  "selected": false
+                },
+                {
+                  "value": "1440",
+                  "text": "美林",
+                  "selected": false
+                },
+                {
+                  "value": "1480",
+                  "text": "美商高盛",
+                  "selected": false
+                },
+                {
+                  "value": "7030",
+                  "text": "致和",
+                  "selected": false
+                },
+                {
+                  "value": "8960",
+                  "text": "香港上海匯豐",
+                  "selected": false
+                },
+                {
+                  "value": "5320",
+                  "text": "高橋",
+                  "selected": false
+                },
+                {
+                  "value": "8880",
+                  "text": "國泰",
+                  "selected": false
+                },
+                {
+                  "value": "7790",
+                  "text": "國票",
+                  "selected": false
+                },
+                {
+                  "value": "8450",
+                  "text": "康和",
+                  "selected": false
+                },
+                {
+                  "value": "5380",
+                  "text": "第一金",
+                  "selected": false
+                },
+                {
+                  "value": "5850",
+                  "text": "統一",
+                  "selected": false
+                },
+                {
+                  "value": "9200",
+                  "text": "凱基",
+                  "selected": false
+                },
+                {
+                  "value": "9600",
+                  "text": "富邦",
+                  "selected": false
+                },
+                {
+                  "value": "7530",
+                  "text": "富順",
+                  "selected": false
+                },
+                {
+                  "value": "1570",
+                  "text": "港商法國興業(停)",
+                  "selected": false
+                },
+                {
+                  "value": "1560",
+                  "text": "港商野村",
+                  "selected": false
+                },
+                {
+                  "value": "1360",
+                  "text": "港商麥格理",
+                  "selected": false
+                },
+                {
+                  "value": "1530",
+                  "text": "港商德意志(停)",
+                  "selected": false
+                },
+                {
+                  "value": "1660",
+                  "text": "港商聯昌",
+                  "selected": false
+                },
+                {
+                  "value": "1400",
+                  "text": "港商蘇皇",
+                  "selected": false
+                },
+                {
+                  "value": "6640",
+                  "text": "渣打商銀",
+                  "selected": false
+                },
+                {
+                  "value": "9300",
+                  "text": "華南永昌",
+                  "selected": false
+                },
+                {
+                  "value": "8710",
+                  "text": "陽信",
+                  "selected": false
+                },
+                {
+                  "value": "1650",
+                  "text": "新加坡商瑞銀",
+                  "selected": false
+                },
+                {
+                  "value": "8560",
+                  "text": "新光",
+                  "selected": false
+                },
+                {
+                  "value": "6210",
+                  "text": "新百王",
+                  "selected": false
+                },
+                {
+                  "value": "8690",
+                  "text": "新壽",
+                  "selected": false
+                },
+                {
+                  "value": "1520",
+                  "text": "瑞士信貸(停)",
+                  "selected": false
+                },
+                {
+                  "value": "8660",
+                  "text": "萬通(停)",
+                  "selected": false
+                },
+                {
+                  "value": "9100",
+                  "text": "群益金鼎",
+                  "selected": false
+                },
+                {
+                  "value": "2210",
+                  "text": "群益期貨",
+                  "selected": false
+                },
+                {
+                  "value": "1230",
+                  "text": "彰銀",
+                  "selected": false
+                },
+                {
+                  "value": "6480",
+                  "text": "福邦",
+                  "selected": false
+                },
+                {
+                  "value": "6950",
+                  "text": "福勝",
+                  "selected": false
+                },
+                {
+                  "value": "1040",
+                  "text": "臺銀",
+                  "selected": false
+                },
+                {
+                  "value": "6910",
+                  "text": "德信",
+                  "selected": false
+                },
+                {
+                  "value": "8440",
+                  "text": "摩根大通",
+                  "selected": false
+                },
+                {
+                  "value": "8580",
+                  "text": "聯邦商銀",
+                  "selected": false
+                },
+                {
+                  "value": "5500",
+                  "text": "豐銀",
+                  "selected": false
+                },
+                {
+                  "value": "7900",
+                  "text": "豐德",
+                  "selected": false
+                }
+              ]
+            },
+            {
+              "tagName": "SELECT",
+              "type": "select-one",
+              "name": "sel_BrokerBranch",
+              "id": "",
+              "value": "6010",
+              "onclick": null,
+              "onchange": "javascript:GoPage(g_FormObj);",
+              "options": [
+                {
+                  "value": "6010",
+                  "text": "(牛牛牛)亞證券",
+                  "selected": true
+                },
+                {
+                  "value": "6012",
+                  "text": "(牛牛牛)亞-網路",
+                  "selected": false
+                },
+                {
+                  "value": "0036003000310064",
+                  "text": "(牛牛牛)亞-鑫豐",
+                  "selected": false
+                }
+              ]
+            },
+            {
+              "tagName": "SELECT",
+              "type": "select-one",
+              "name": "D",
+              "id": "",
+              "value": "1",
+              "onclick": null,
+              "onchange": "goA();",
+              "options": [
+                {
+                  "value": "0",
+                  "text": "請選擇",
+                  "selected": false
+                },
+                {
+                  "value": "1",
+                  "text": "近20日",
+                  "selected": true
+                },
+                {
+                  "value": "2",
+                  "text": "近40日",
+                  "selected": false
+                },
+                {
+                  "value": "3",
+                  "text": "近60日",
+                  "selected": false
+                }
+              ]
+            },
+            {
+              "tagName": "SELECT",
+              "type": "select-one",
+              "name": "Y2",
+              "id": "",
+              "value": "2026",
+              "onclick": null,
+              "onchange": "javascript:SetMonthDate(document.F.Y2,document.F.M2,document.F.D2);",
+              "options": [
+                {
+                  "value": "2025",
+                  "text": "114",
+                  "selected": false
+                },
+                {
+                  "value": "2026",
+                  "text": "115",
+                  "selected": true
+                }
+              ]
+            },
+            {
+              "tagName": "SELECT",
+              "type": "select-one",
+              "name": "M2",
+              "id": "",
+              "value": "6",
+              "onclick": null,
+              "onchange": "javascript:SetMonthDate(document.F.Y2,document.F.M2,document.F.D2);",
+              "options": [
+                {
+                  "value": "1",
+                  "text": "1",
+                  "selected": false
+                },
+                {
+                  "value": "2",
+                  "text": "2",
+                  "selected": false
+                },
+                {
+                  "value": "3",
+                  "text": "3",
+                  "selected": false
+                },
+                {
+                  "value": "4",
+                  "text": "4",
+                  "selected": false
+                },
+                {
+                  "value": "5",
+                  "text": "5",
+                  "selected": false
+                },
+                {
+                  "value": "6",
+                  "text": "6",
+                  "selected": true
+                },
+                {
+                  "value": "7",
+                  "text": "7",
+                  "selected": false
+                },
+                {
+                  "value": "8",
+                  "text": "8",
+                  "selected": false
+                }
+              ]
+            },
+            {
+              "tagName": "SELECT",
+              "type": "select-one",
+              "name": "D2",
+              "id": "",
+              "value": "26",
+              "onclick": null,
+              "onchange": null,
+              "options": [
+                {
+                  "value": "1",
+                  "text": "1",
+                  "selected": false
+                },
+                {
+                  "value": "2",
+                  "text": "2",
+                  "selected": false
+                },
+                {
+                  "value": "3",
+                  "text": "3",
+                  "selected": false
+                },
+                {
+                  "value": "4",
+                  "text": "4",
+                  "selected": false
+                },
+                {
+                  "value": "5",
+                  "text": "5",
+                  "selected": false
+                },
+                {
+                  "value": "6",
+                  "text": "6",
+                  "selected": false
+                },
+                {
+                  "value": "7",
+                  "text": "7",
+                  "selected": false
+                },
+                {
+                  "value": "8",
+                  "text": "8",
+                  "selected": false
+                },
+                {
+                  "value": "9",
+                  "text": "9",
+                  "selected": false
+                },
+                {
+                  "value": "10",
+                  "text": "10",
+                  "selected": false
+                },
+                {
+                  "value": "11",
+                  "text": "11",
+                  "selected": false
+                },
+                {
+                  "value": "12",
+                  "text": "12",
+                  "selected": false
+                },
+                {
+                  "value": "13",
+                  "text": "13",
+                  "selected": false
+                },
+                {
+                  "value": "14",
+                  "text": "14",
+                  "selected": false
+                },
+                {
+                  "value": "15",
+                  "text": "15",
+                  "selected": false
+                },
+                {
+                  "value": "16",
+                  "text": "16",
+                  "selected": false
+                },
+                {
+                  "value": "17",
+                  "text": "17",
+                  "selected": false
+                },
+                {
+                  "value": "18",
+                  "text": "18",
+                  "selected": false
+                },
+                {
+                  "value": "19",
+                  "text": "19",
+                  "selected": false
+                },
+                {
+                  "value": "20",
+                  "text": "20",
+                  "selected": false
+                },
+                {
+                  "value": "21",
+                  "text": "21",
+                  "selected": false
+                },
+                {
+                  "value": "22",
+                  "text": "22",
+                  "selected": false
+                },
+                {
+                  "value": "23",
+                  "text": "23",
+                  "selected": false
+                },
+                {
+                  "value": "24",
+                  "text": "24",
+                  "selected": false
+                },
+                {
+                  "value": "25",
+                  "text": "25",
+                  "selected": false
+                },
+                {
+                  "value": "26",
+                  "text": "26",
+                  "selected": true
+                },
+                {
+                  "value": "27",
+                  "text": "27",
+                  "selected": false
+                },
+                {
+                  "value": "28",
+                  "text": "28",
+                  "selected": false
+                },
+                {
+                  "value": "29",
+                  "text": "29",
+                  "selected": false
+                },
+                {
+                  "value": "30",
+                  "text": "30",
+                  "selected": false
+                }
+              ]
+            },
+            {
+              "tagName": "SELECT",
+              "type": "select-one",
+              "name": "Y1",
+              "id": "",
+              "value": "2026",
+              "onclick": null,
+              "onchange": "javascript:SetMonthDate(document.F.Y1,document.F.M1,document.F.D1);",
+              "options": [
+                {
+                  "value": "2025",
+                  "text": "114",
+                  "selected": false
+                },
+                {
+                  "value": "2026",
+                  "text": "115",
+                  "selected": true
+                }
+              ]
+            },
+            {
+              "tagName": "SELECT",
+              "type": "select-one",
+              "name": "M1",
+              "id": "",
+              "value": "8",
+              "onclick": null,
+              "onchange": "javascript:SetMonthDate(document.F.Y1,document.F.M1,document.F.D1);",
+              "options": [
+                {
+                  "value": "1",
+                  "text": "1",
+                  "selected": false
+                },
+                {
+                  "value": "2",
+                  "text": "2",
+                  "selected": false
+                },
+                {
+                  "value": "3",
+                  "text": "3",
+                  "selected": false
+                },
+                {
+                  "value": "4",
+                  "text": "4",
+                  "selected": false
+                },
+                {
+                  "value": "5",
+                  "text": "5",
+                  "selected": false
+                },
+                {
+                  "value": "6",
+                  "text": "6",
+                  "selected": false
+                },
+                {
+                  "value": "7",
+                  "text": "7",
+                  "selected": false
+                },
+                {
+                  "value": "8",
+                  "text": "8",
+                  "selected": true
+                }
+              ]
+            },
+            {
+              "tagName": "SELECT",
+              "type": "select-one",
+              "name": "D1",
+              "id": "",
+              "value": "10",
+              "onclick": null,
+              "onchange": null,
+              "options": [
+                {
+                  "value": "1",
+                  "text": "1",
+                  "selected": false
+                },
+                {
+                  "value": "2",
+                  "text": "2",
+                  "selected": false
+                },
+                {
+                  "value": "3",
+                  "text": "3",
+                  "selected": false
+                },
+                {
+                  "value": "4",
+                  "text": "4",
+                  "selected": false
+                },
+                {
+                  "value": "5",
+                  "text": "5",
+                  "selected": false
+                },
+                {
+                  "value": "6",
+                  "text": "6",
+                  "selected": false
+                },
+                {
+                  "value": "7",
+                  "text": "7",
+                  "selected": false
+                },
+                {
+                  "value": "8",
+                  "text": "8",
+                  "selected": false
+                },
+                {
+                  "value": "9",
+                  "text": "9",
+                  "selected": false
+                },
+                {
+                  "value": "10",
+                  "text": "10",
+                  "selected": true
+                }
+              ]
+            },
+            {
+              "tagName": "INPUT",
+              "type": "hidden",
+              "name": "bDate",
+              "id": "",
+              "value": "",
+              "onclick": null,
+              "onchange": null
+            },
+            {
+              "tagName": "INPUT",
+              "type": "hidden",
+              "name": "eDate",
+              "id": "",
+              "value": "",
+              "onclick": null,
+              "onchange": null
+            },
+            {
+              "tagName": "INPUT",
+              "type": "button",
+              "name": "BB",
+              "id": "",
+              "value": "查詢",
+              "onclick": "javascript:goB();",
+              "onchange": null
+            }
+          ]
+        }
+      ],
+      "body_head": "  個股區\n所屬產業\n公司互動\n動態報導\n個股速覽\n公開說明書\n個股比較\n基本分析\n籌碼分析\n財務分析\n技術分析\n台灣摩根士丹利 對 台積電(2330)個股 單一券商歷史明細\n總表 單一\n(牛牛牛)亞證券\n口袋證券\n土銀\n大和國泰\n大昌\n大展\n大鼎(停)\n中國信託\n中農\n元大\n元大期貨\n日茂\n日進\n北城\n台中銀\n台安\n台新\n台新銀\n台灣工銀\n台灣巴克萊\n台灣企銀\n台灣摩根士丹利\n永全\n永興\n永豐金\n玉山\n石橋\n光和\n兆豐\n合庫\n安泰\n宏遠\n亞東\n京城\n和興\n法銀巴黎\n花旗\n花旗環球\n金興\n盈溢\n美好\n美林\n美商高盛\n致和\n香港上海匯豐\n高橋\n國泰\n國票\n康和\n第一金\n統一\n凱基\n富邦\n富順\n港商法國興業(停)\n港商野村\n港商麥格理\n港商德意志(停)\n港商聯昌\n港商蘇皇\n渣打商銀\n華南永昌\n陽信\n新加坡商瑞銀\n新光\n新百王\n新壽\n瑞士信貸(停)\n萬通(停)\n群益金鼎\n群益期貨\n彰銀\n福邦\n福勝\n臺銀\n德信\n摩根大通\n聯邦商銀\n豐銀\n豐德\n豐興\n寶盛\n(牛牛牛)亞證券\n(牛牛牛)亞-網路\n(牛牛牛)亞-鑫豐\n8/07 2,370元 (台積電股價)\n8/07 -2,205張 (買賣超)\n進出明細表\n請選擇\n近20日\n近40日\n近60日\n自設區間： 從　\n \n114\n115\n年 \n \n1\n2\n3\n4\n5\n6\n7\n8\n月 \n \n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\n14\n15\n16\n17\n18\n19\n20\n21\n22\n23\n24\n25\n26\n27\n28\n29\n30\n日 ～ \n \n114\n115\n年 \n \n1\n2\n3\n4\n5\n6\n7\n8\n月 \n \n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n日\n日期 買進(張) 賣出(張) 買賣總額(張) 買賣超(張)\n2026/08/07 641 2,846 3,487 -2,205\n2026/08/06 1,091 1,361 2,452 -271\n2026/08/05 5,678 571 6,250 5,107\n2026/08/04 1,300 3,714 5,014 -2,414\n2026/08/03 1,143 8,710 9,853 -7,567\n2026/07/31 4,868 2,294 7,163 2,574\n2026/07/30 3,309 6,364 9,673 -3,054\n2026/07/29 2,257 10,388 12,645 -8,131\n2026/07/28 1,765 2,620 4,385 -855\n2026/07/27 3,348 2,948 6,296 400\n2026/07/24 485 2,304 2,789 -1,820\n2026/07/23 308 1,179 1,487 -870\n2026/07/22 1,730 1,741 3,470 -11\n2026/07/21 1,625 1,916 3,541 -291\n2026/07/20 1,801 7,372 9,173 -5,571\n2026/07/17 302 6,034 6,336 -5,732\n2026/07/16 525 3,387 3,912 -2,861\n2026/07/15 481 2,919 3,400 -2,438\n2026/07/14 1,136 2,369 3,505 -1,232\n2026/07/13 3,185 3,112 6,297 73\n期間累計買賣超張數： -37,169",
+      "links": [],
+      "script_srcs": [
+        "https://5850web.moneydj.com/z/js/zbrokerjs.djjs"
+      ]
+    }
+  ],
+  "scripts": [
+    {
+      "url": "https://5850web.moneydj.com/z/js/zbrokerjs.djjs",
+      "file": "script_0.js",
+      "chars": 19058,
+      "tokens": []
+    }
+  ]
+}
