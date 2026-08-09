@@ -1,0 +1,282 @@
+[
+  {
+    "url": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&A=2330&BHID=1470&b=1470&C=1&D=2022-01-01&E=2025-06-30&ver=V3",
+    "status": 200,
+    "mime": "text/html",
+    "type": "Document",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/z/js/mdj.js",
+    "status": 200,
+    "mime": "application/javascript",
+    "type": "Script",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/z/js/jsFunction.djjs",
+    "status": 200,
+    "mime": "text/javascript",
+    "type": "Script",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/z/js/Applet2Canvas.djjs",
+    "status": 200,
+    "mime": "text/javascript",
+    "type": "Script",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/z/js/isSpecialKind.djjs",
+    "status": 200,
+    "mime": "text/javascript",
+    "type": "Script",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/z/js/SU.js",
+    "status": 200,
+    "mime": "application/javascript",
+    "type": "Script",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/z/js/json2.djjs",
+    "status": 200,
+    "mime": "text/javascript",
+    "type": "Script",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/z/js/DJWebGraph.djjs",
+    "status": 200,
+    "mime": "text/javascript",
+    "type": "Script",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/z/js/GenUpDownJS.djjs",
+    "status": 200,
+    "mime": "text/javascript",
+    "type": "Script",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/z/js/mdj.css",
+    "status": 200,
+    "mime": "text/css",
+    "type": "Stylesheet",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/z/js/SL.js",
+    "status": 200,
+    "mime": "application/javascript",
+    "type": "Script",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/z/js/disableselectionjs.djjs",
+    "status": 200,
+    "mime": "text/javascript",
+    "type": "Script",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/z/js/json2xmlJS.djjs",
+    "status": 200,
+    "mime": "text/javascript",
+    "type": "Script",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/z/js/xml2jsonJS.djjs",
+    "status": 200,
+    "mime": "text/javascript",
+    "type": "Script",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/z/js/SD.js",
+    "status": 200,
+    "mime": "application/javascript",
+    "type": "Script",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/z/js/SR.js",
+    "status": 200,
+    "mime": "application/javascript",
+    "type": "Script",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/z/js/jquery.djjs",
+    "status": 200,
+    "mime": "text/javascript",
+    "type": "Script",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/z/js/zbrokerjs.djjs",
+    "status": 200,
+    "mime": "text/javascript",
+    "type": "Script",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/z/js/month.djjs",
+    "status": 200,
+    "mime": "text/javascript",
+    "type": "Script",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/DJJSLib/GetDJJSLibURL.djcss?a=7&cvsVer=3",
+    "status": 200,
+    "mime": "text/css",
+    "type": "Stylesheet",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/DJJSLib/GetDJJSLibURL.djcss?a=4&cvsVer=3",
+    "status": 200,
+    "mime": "text/css",
+    "type": "Stylesheet",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/DJJSLib/GetDJJSLibURL.djcss?a=13&cvsVer=3",
+    "status": 200,
+    "mime": "text/css",
+    "type": "Stylesheet",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/DJJSLib/GetDJJSLibURL.djcss?a=10&cvsVer=3",
+    "status": 200,
+    "mime": "text/css",
+    "type": "Stylesheet",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/z/JS/FundViewA2C.djcss",
+    "status": 200,
+    "mime": "text/css",
+    "type": "Stylesheet",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/DJJSLib/GetDJJSLibURL.djjs?a=6&cvsVer=3",
+    "status": 200,
+    "mime": "text/javascript",
+    "type": "Script",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/DJJSLib/GetDJJSLibURL.djjs?a=5&cvsVer=3",
+    "status": 200,
+    "mime": "text/javascript",
+    "type": "Script",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/DJJSLib/GetDJJSLibURL.djjs?a=3&cvsVer=3",
+    "status": 200,
+    "mime": "text/javascript",
+    "type": "Script",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/DJJSLib/GetDJJSLibURL.djjs?a=11&cvsVer=3",
+    "status": 200,
+    "mime": "text/javascript",
+    "type": "Script",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/DJJSLib/GetDJJSLibURL.djjs?a=9&cvsVer=3",
+    "status": 200,
+    "mime": "text/javascript",
+    "type": "Script",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/z/JS/MbChart.ConfigA2C.djjs",
+    "status": 200,
+    "mime": "text/javascript",
+    "type": "Script",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/DJJSLib/GetDJJSLibURL.djjs?a=12&cvsVer=3",
+    "status": 200,
+    "mime": "text/javascript",
+    "type": "Script",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/DJJSLib/GetDJJSLibURL.djjs?a=2&cvsVer=3",
+    "status": 200,
+    "mime": "text/javascript",
+    "type": "Script",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/DJJSLib/GetDJJSLibURL.djjs?a=8",
+    "status": 200,
+    "mime": "text/javascript",
+    "type": "Script",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/DJJSLib/GetDJJSLibURL.djcss?a=4&cvsVer=3",
+    "status": 200,
+    "mime": "text/css",
+    "type": "Image",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/z/images/node.gif",
+    "status": 200,
+    "mime": "image/gif",
+    "type": "Image",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/z/images/lastnode.gif",
+    "status": 200,
+    "mime": "image/gif",
+    "type": "Image",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/z/images/des.gif",
+    "status": 200,
+    "mime": "image/gif",
+    "type": "Image",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/z/images/closedfolder.gif",
+    "status": 200,
+    "mime": "image/gif",
+    "type": "Image",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/z/images/doc.gif",
+    "status": 200,
+    "mime": "image/gif",
+    "type": "Image",
+    "host": "5850web.moneydj.com"
+  },
+  {
+    "url": "https://5850web.moneydj.com/favicon.ico",
+    "status": 404,
+    "mime": "text/html",
+    "type": "Other",
+    "host": "5850web.moneydj.com"
+  }
+]

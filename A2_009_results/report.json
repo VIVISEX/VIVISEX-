@@ -1,0 +1,46 @@
+{
+  "version": "A2_009_NETWORK_PROBE_V1.0.0",
+  "target": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&A=2330&BHID=1470&b=1470&C=1&D=2022-01-01&E=2025-06-30&ver=V3",
+  "requests": 40,
+  "hosts": [
+    "5850web.moneydj.com"
+  ],
+  "candidate_count": 5,
+  "candidates": [
+    {
+      "url": "https://5850web.moneydj.com/z/zc/zco/zco0/zco0.djhtm?a=2330&A=2330&BHID=1470&b=1470&C=1&D=2022-01-01&E=2025-06-30&ver=V3",
+      "status": 200,
+      "mime": "text/html",
+      "type": "Document",
+      "host": "5850web.moneydj.com"
+    },
+    {
+      "url": "https://5850web.moneydj.com/z/js/json2.djjs",
+      "status": 200,
+      "mime": "text/javascript",
+      "type": "Script",
+      "host": "5850web.moneydj.com"
+    },
+    {
+      "url": "https://5850web.moneydj.com/z/js/json2xmlJS.djjs",
+      "status": 200,
+      "mime": "text/javascript",
+      "type": "Script",
+      "host": "5850web.moneydj.com"
+    },
+    {
+      "url": "https://5850web.moneydj.com/z/js/xml2jsonJS.djjs",
+      "status": 200,
+      "mime": "text/javascript",
+      "type": "Script",
+      "host": "5850web.moneydj.com"
+    },
+    {
+      "url": "https://5850web.moneydj.com/z/js/zbrokerjs.djjs",
+      "status": 200,
+      "mime": "text/javascript",
+      "type": "Script",
+      "host": "5850web.moneydj.com"
+    }
+  ]
+}
