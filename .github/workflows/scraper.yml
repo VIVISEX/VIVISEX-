@@ -15,7 +15,7 @@ on:
     - cron: "25 0 * * 1-5"
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: qts-a4-mis-preopen
@@ -54,6 +54,8 @@ jobs:
           pip install pandas requests pyarrow shioaji
 
       - name: Run A4 MIS scraper
+        id: scraper
+        continue-on-error: true
         run: |
           python "A4_001_TWSE_MIS盤前試撮抓取.py"
 
@@ -65,3 +67,79 @@ jobs:
           path: output/mis/
           if-no-files-found: warn
           retention-days: 90
+
+      - name: Persist A4 run status to repository
+        if: always()
+        env:
+          SCRAPER_OUTCOME: ${{ steps.scraper.outcome }}
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -u
+          mkdir -p status/a4
+          DATE_TW=$(TZ=Asia/Taipei date +%F)
+          NOW_TW=$(TZ=Asia/Taipei date --iso-8601=seconds)
+          REPORT=""
+          if [ -f "output/mis/report_${DATE_TW}.json" ]; then
+            REPORT="output/mis/report_${DATE_TW}.json"
+          elif [ -f "output/mis/env_test_report.json" ]; then
+            REPORT="output/mis/env_test_report.json"
+          elif [ -f "output/mis/fatal_error.json" ]; then
+            REPORT="output/mis/fatal_error.json"
+          fi
+
+          if [ -n "$REPORT" ]; then
+            jq --arg checked_at "$NOW_TW" \
+               --arg workflow_outcome "$SCRAPER_OUTCOME" \
+               --arg event_name "$EVENT_NAME" \
+               --arg run_id "$RUN_ID" \
+               --arg run_attempt "$RUN_ATTEMPT" \
+               --arg sha "$SHA" \
+               '. + {
+                 checked_at: $checked_at,
+                 workflow_outcome: $workflow_outcome,
+                 event_name: $event_name,
+                 run_id: $run_id,
+                 run_attempt: $run_attempt,
+                 source_commit: $sha
+               }' "$REPORT" > status/a4/latest.json
+          else
+            jq -n --arg checked_at "$NOW_TW" \
+                  --arg workflow_outcome "$SCRAPER_OUTCOME" \
+                  --arg event_name "$EVENT_NAME" \
+                  --arg run_id "$RUN_ID" \
+                  --arg run_attempt "$RUN_ATTEMPT" \
+                  --arg sha "$SHA" \
+                  '{
+                    checked_at: $checked_at,
+                    workflow_outcome: $workflow_outcome,
+                    event_name: $event_name,
+                    run_id: $run_id,
+                    run_attempt: $run_attempt,
+                    source_commit: $sha,
+                    pass: false,
+                    reason: "NO_REPORT_FILE"
+                  }' > status/a4/latest.json
+          fi
+
+          cp status/a4/latest.json "status/a4/${DATE_TW}_${RUN_ID}.json"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add status/a4/latest.json "status/a4/${DATE_TW}_${RUN_ID}.json"
+          if git diff --cached --quiet; then
+            echo "No status changes to commit"
+          else
+            git commit -m "A4 status: ${DATE_TW} run ${RUN_ID}"
+            git push
+          fi
+
+      - name: Enforce scraper result
+        if: always()
+        run: |
+          if [ "${{ steps.scraper.outcome }}" != "success" ]; then
+            echo "A4 scraper failed"
+            exit 1
+          fi
