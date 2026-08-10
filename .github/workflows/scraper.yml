@@ -1,4 +1,5 @@
 name: QTS A4 TWSE MIS preopen scraper
+run-name: A4 MIS ${{ github.event_name == 'schedule' && 'LIVE' || format('MANUAL-{0}', inputs.run_mode) }} | ${{ github.run_id }}
 
 on:
   workflow_dispatch:
@@ -18,7 +19,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: qts-a4-mis-preopen
+  group: qts-a4-mis-preopen-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -38,29 +39,62 @@ jobs:
       MAX_RETRIES: "5"
       REQUEST_TIMEOUT: "8"
       RUN_MODE: ${{ github.event_name == 'schedule' && 'live' || inputs.run_mode }}
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
 
     steps:
-      - name: Checkout
+      - name: Checkout latest default branch
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+
+      - name: Production duplicate guard
+        id: guard
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "$RUN_MODE" != "live" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "reason=non_live" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          DATE_TW=$(TZ=Asia/Taipei date +%F)
+          git fetch origin "$DEFAULT_BRANCH" --quiet
+          COMPLETED_PATH="status/a4/${DATE_TW}_COMPLETED.json"
+
+          if git cat-file -e "origin/${DEFAULT_BRANCH}:${COMPLETED_PATH}" 2>/dev/null; then
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "reason=already_completed" >> "$GITHUB_OUTPUT"
+            echo "A4 live run already completed for ${DATE_TW}; duplicate/recovery run will exit cleanly."
+            exit 0
+          fi
+
+          echo "should_run=true" >> "$GITHUB_OUTPUT"
+          echo "reason=not_completed" >> "$GITHUB_OUTPUT"
 
       - name: Python
+        if: steps.guard.outputs.should_run == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Install
+        if: steps.guard.outputs.should_run == 'true'
         run: |
           python -m pip install --upgrade pip
-          pip install pandas requests pyarrow shioaji
+          pip install pandas requests pyarrow
 
       - name: Run A4 MIS scraper
+        if: steps.guard.outputs.should_run == 'true'
         id: scraper
         continue-on-error: true
         run: |
           python "A4_001_TWSE_MIS盤前試撮抓取.py"
 
       - name: Upload captured data
-        if: always()
+        if: ${{ always() && steps.guard.outputs.should_run == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: qts-a4-mis-${{ github.run_id }}
@@ -69,7 +103,7 @@ jobs:
           retention-days: 90
 
       - name: Persist A4 run status to repository
-        if: always()
+        if: ${{ always() && steps.guard.outputs.should_run == 'true' }}
         env:
           SCRAPER_OUTCOME: ${{ steps.scraper.outcome }}
           EVENT_NAME: ${{ github.event_name }}
@@ -77,11 +111,15 @@ jobs:
           RUN_ATTEMPT: ${{ github.run_attempt }}
           SHA: ${{ github.sha }}
         run: |
-          set -u
-          mkdir -p status/a4
+          set -euo pipefail
+
           DATE_TW=$(TZ=Asia/Taipei date +%F)
           NOW_TW=$(TZ=Asia/Taipei date --iso-8601=seconds)
           REPORT=""
+
+          git pull --rebase origin "$DEFAULT_BRANCH"
+          mkdir -p status/a4
+
           if [ -f "output/mis/report_${DATE_TW}.json" ]; then
             REPORT="output/mis/report_${DATE_TW}.json"
           elif [ -f "output/mis/env_test_report.json" ]; then
@@ -103,7 +141,8 @@ jobs:
                  event_name: $event_name,
                  run_id: $run_id,
                  run_attempt: $run_attempt,
-                 source_commit: $sha
+                 source_commit: $sha,
+                 pass: (((.pass // .pass_candidate // false) == true) and ($workflow_outcome == "success"))
                }' "$REPORT" > status/a4/latest.json
           else
             jq -n --arg checked_at "$NOW_TW" \
@@ -126,19 +165,32 @@ jobs:
 
           cp status/a4/latest.json "status/a4/${DATE_TW}_${RUN_ID}.json"
 
+          if jq -e '.pass == true' status/a4/latest.json >/dev/null; then
+            cp status/a4/latest.json "status/a4/${DATE_TW}_COMPLETED.json"
+          fi
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add status/a4/latest.json "status/a4/${DATE_TW}_${RUN_ID}.json"
+          if [ -f "status/a4/${DATE_TW}_COMPLETED.json" ]; then
+            git add "status/a4/${DATE_TW}_COMPLETED.json"
+          fi
+
           if git diff --cached --quiet; then
             echo "No status changes to commit"
           else
             git commit -m "A4 status: ${DATE_TW} run ${RUN_ID}"
-            git push
+            git push origin "$DEFAULT_BRANCH"
           fi
 
       - name: Enforce scraper result
         if: always()
         run: |
+          if [ "${{ steps.guard.outputs.should_run }}" != "true" ]; then
+            echo "A4 duplicate/recovery run skipped: ${{ steps.guard.outputs.reason }}"
+            exit 0
+          fi
+
           if [ "${{ steps.scraper.outcome }}" != "success" ]; then
             echo "A4 scraper failed"
             exit 1
