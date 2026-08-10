@@ -1,0 +1,12 @@
+{
+  "mode": "live",
+  "pass": false,
+  "reason": "started_after_end_time",
+  "actual_process_start": "2026-08-10T10:39:04.137956+08:00",
+  "checked_at": "2026-08-10T10:39:05+08:00",
+  "workflow_outcome": "failure",
+  "event_name": "schedule",
+  "run_id": "31350349789",
+  "run_attempt": "1",
+  "source_commit": "4603de30568d45c01bb1294610e3108b3cc2e216"
+}
