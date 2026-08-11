@@ -19,8 +19,8 @@ permissions:
   contents: write
 
 concurrency:
-  group: qts-a4-mis-preopen-${{ github.ref }}
-  cancel-in-progress: false
+  group: ${{ (github.event_name == 'schedule' || inputs.run_mode == 'live') && 'qts-a4-mis-production' || format('qts-a4-mis-test-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'workflow_dispatch' && inputs.run_mode == 'live' }}
 
 jobs:
   scrape:
@@ -186,6 +186,11 @@ jobs:
       - name: Enforce scraper result
         if: always()
         run: |
+          if [ "${{ steps.guard.outcome }}" != "success" ]; then
+            echo "A4 production guard failed"
+            exit 1
+          fi
+
           if [ "${{ steps.guard.outputs.should_run }}" != "true" ]; then
             echo "A4 duplicate/recovery run skipped: ${{ steps.guard.outputs.reason }}"
             exit 0
