@@ -12,8 +12,8 @@ const A4_WATCHDOG = Object.freeze({
 
 function A4_001A_installAndVerify() {
   const verification = A4_001A_selfTest();
-  A4_001A_installWatchdog();
   A4_dispatch_(A4_loadConfig_(), 'env_test');
+  A4_001A_installWatchdog();
 
   console.log(JSON.stringify({
     component: 'A4_001A',
