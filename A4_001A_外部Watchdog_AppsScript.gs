@@ -5,9 +5,46 @@ const A4_WATCHDOG = Object.freeze({
   lastCheckMinute: 8 * 60 + 35,
   maxRecoveryDispatches: 2,
   dispatchCooldownMs: 90 * 1000,
+  startGraceMs: 90 * 1000,
   apiVersion: '2022-11-28',
-  userAgent: 'QTS-A4-External-Watchdog/1.0'
+  userAgent: 'QTS-A4-External-Watchdog/1.1'
 });
+
+function A4_001A_installAndVerify() {
+  const verification = A4_001A_selfTest();
+  A4_001A_installWatchdog();
+  A4_dispatch_(A4_loadConfig_(), 'env_test');
+
+  console.log(JSON.stringify({
+    component: 'A4_001A',
+    action: 'install_and_verify',
+    status: 'PASS',
+    workflow_id: verification.workflow_id,
+    watchdog: 'INSTALLED',
+    authorization_probe: 'ENV_TEST_DISPATCHED'
+  }));
+}
+
+function A4_001A_selfTest() {
+  const cfg = A4_loadConfig_();
+  const workflow = A4_getWorkflow_(cfg);
+  const runs = A4_listWorkflowRuns_(cfg);
+
+  const result = {
+    component: 'A4_001A',
+    action: 'self_test',
+    status: 'PASS',
+    repository: `${cfg.owner}/${cfg.repo}`,
+    branch: cfg.branch,
+    workflow: A4_WATCHDOG.workflow,
+    workflow_id: workflow.id || null,
+    workflow_state: workflow.state || null,
+    visible_runs: runs.length
+  };
+
+  console.log(JSON.stringify(result));
+  return result;
+}
 
 function A4_001A_installWatchdog() {
   const handler = 'A4_001A_watchdogTick';
@@ -59,38 +96,49 @@ function A4_001A_watchdogTick() {
       .filter(run => A4_isLiveRunToday_(run, today))
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-    const hasSuccessfulRun = liveRunsToday.some(
+    const successful = liveRunsToday.find(
       run => run.status === 'completed' && run.conclusion === 'success'
     );
-    if (hasSuccessfulRun) {
-      A4_log_('HEALTHY', 'successful_live_run_exists', liveRunsToday[0] || null, state);
+    if (successful) {
+      A4_log_('HEALTHY', 'successful_live_run_exists', successful, state, null);
       return;
     }
 
     const latest = liveRunsToday[0] || null;
-    if (latest && (latest.status === 'queued' || latest.status === 'in_progress' || latest.status === 'waiting')) {
-      A4_log_('HEALTHY', 'live_run_started', latest, state);
-      return;
+    if (latest) {
+      const health = A4_getRunHealth_(cfg, latest, now);
+      if (health.started) {
+        A4_log_('HEALTHY', 'runner_job_started', latest, state, health);
+        return;
+      }
+
+      if (health.ageMs < A4_WATCHDOG.startGraceMs) {
+        A4_log_('WAIT', 'run_exists_within_start_grace', latest, state, health);
+        return;
+      }
     }
 
     const nowMs = now.getTime();
     if (state.recoveryCount >= A4_WATCHDOG.maxRecoveryDispatches) {
-      A4_log_('SOURCE_GAP', 'recovery_limit_reached', latest, state);
+      A4_log_('SOURCE_GAP', 'recovery_limit_reached', latest, state, latest ? A4_getRunHealth_(cfg, latest, now) : null);
       return;
     }
 
     if (state.lastDispatchMs > 0 && nowMs - state.lastDispatchMs < A4_WATCHDOG.dispatchCooldownMs) {
-      A4_log_('WAIT', 'dispatch_cooldown', latest, state);
+      A4_log_('WAIT', 'dispatch_cooldown', latest, state, null);
       return;
     }
 
-    const reason = latest ? `latest_live_run_${latest.conclusion || latest.status}` : 'no_live_run_started';
-    A4_dispatchLive_(cfg);
+    const reason = latest
+      ? `runner_not_started_${latest.conclusion || latest.status || 'unknown'}`
+      : 'no_live_run_created';
+
+    A4_dispatch_(cfg, 'live');
 
     state.recoveryCount += 1;
     state.lastDispatchMs = nowMs;
     A4_saveState_(state);
-    A4_log_('RECOVERY_DISPATCHED', reason, latest, state);
+    A4_log_('RECOVERY_DISPATCHED', reason, latest, state, null);
   } catch (error) {
     console.error(JSON.stringify({
       component: 'A4_001A',
@@ -136,12 +184,52 @@ function A4_saveState_(state) {
   }, false);
 }
 
+function A4_getWorkflow_(cfg) {
+  const workflow = encodeURIComponent(A4_WATCHDOG.workflow);
+  const url = `https://api.github.com/repos/${encodeURIComponent(cfg.owner)}/${encodeURIComponent(cfg.repo)}/actions/workflows/${workflow}`;
+  const response = A4_githubFetch_(cfg, url, { method: 'get' });
+  return JSON.parse(response.getContentText() || '{}');
+}
+
 function A4_listWorkflowRuns_(cfg) {
   const workflow = encodeURIComponent(A4_WATCHDOG.workflow);
   const url = `https://api.github.com/repos/${encodeURIComponent(cfg.owner)}/${encodeURIComponent(cfg.repo)}/actions/workflows/${workflow}/runs?per_page=30`;
   const response = A4_githubFetch_(cfg, url, { method: 'get' });
   const body = JSON.parse(response.getContentText() || '{}');
   return Array.isArray(body.workflow_runs) ? body.workflow_runs : [];
+}
+
+function A4_listRunJobs_(cfg, runId) {
+  const url = `https://api.github.com/repos/${encodeURIComponent(cfg.owner)}/${encodeURIComponent(cfg.repo)}/actions/runs/${encodeURIComponent(String(runId))}/jobs?filter=latest&per_page=100`;
+  const response = A4_githubFetch_(cfg, url, { method: 'get' });
+  const body = JSON.parse(response.getContentText() || '{}');
+  return Array.isArray(body.jobs) ? body.jobs : [];
+}
+
+function A4_getRunHealth_(cfg, run, now) {
+  const jobs = A4_listRunJobs_(cfg, run.id);
+  const startedJobs = jobs.filter(job =>
+    job.status === 'in_progress' ||
+    job.status === 'completed' ||
+    Boolean(job.started_at)
+  );
+
+  const createdMs = run.created_at ? new Date(run.created_at).getTime() : 0;
+  const ageMs = createdMs > 0 ? Math.max(0, now.getTime() - createdMs) : Number.MAX_SAFE_INTEGER;
+
+  return {
+    started: startedJobs.length > 0,
+    ageMs,
+    totalJobs: jobs.length,
+    startedJobs: startedJobs.length,
+    jobStatuses: jobs.map(job => ({
+      id: job.id,
+      name: job.name,
+      status: job.status,
+      conclusion: job.conclusion,
+      started_at: job.started_at || null
+    }))
+  };
 }
 
 function A4_isLiveRunToday_(run, today) {
@@ -155,7 +243,11 @@ function A4_isLiveRunToday_(run, today) {
   return localDate === today;
 }
 
-function A4_dispatchLive_(cfg) {
+function A4_dispatch_(cfg, runMode) {
+  if (runMode !== 'live' && runMode !== 'env_test') {
+    throw new Error(`Unsupported dispatch mode: ${runMode}`);
+  }
+
   const workflow = encodeURIComponent(A4_WATCHDOG.workflow);
   const url = `https://api.github.com/repos/${encodeURIComponent(cfg.owner)}/${encodeURIComponent(cfg.repo)}/actions/workflows/${workflow}/dispatches`;
   const response = A4_githubFetch_(cfg, url, {
@@ -163,7 +255,7 @@ function A4_dispatchLive_(cfg) {
     contentType: 'application/json',
     payload: JSON.stringify({
       ref: cfg.branch,
-      inputs: { run_mode: 'live' }
+      inputs: { run_mode: runMode }
     })
   });
 
@@ -201,7 +293,7 @@ function A4_githubFetch_(cfg, url, options) {
   throw new Error(`GitHub API failed: HTTP ${lastCode}; body=${lastBody.slice(0, 500)}`);
 }
 
-function A4_log_(status, reason, run, state) {
+function A4_log_(status, reason, run, state, health) {
   console.log(JSON.stringify({
     component: 'A4_001A',
     status,
@@ -209,8 +301,12 @@ function A4_log_(status, reason, run, state) {
     at: Utilities.formatDate(new Date(), A4_WATCHDOG.timezone, "yyyy-MM-dd'T'HH:mm:ssXXX"),
     recovery_count: state.recoveryCount,
     latest_run_id: run ? run.id : null,
+    latest_run_event: run ? run.event : null,
     latest_run_status: run ? run.status : null,
     latest_run_conclusion: run ? run.conclusion : null,
-    latest_run_created_at: run ? run.created_at : null
+    latest_run_created_at: run ? run.created_at : null,
+    runner_started: health ? health.started : null,
+    runner_jobs: health ? health.totalJobs : null,
+    runner_started_jobs: health ? health.startedJobs : null
   }));
 }
