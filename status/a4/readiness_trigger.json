@@ -1,7 +1,7 @@
 {
   "component": "A4_001T",
-  "requested_at": "2026-08-13T01:50:00+08:00",
-  "requested_by": "ChatGPT_A4",
-  "reason": "production_readiness_historical_replay_and_live_mis_probe",
-  "attempt": 1
+  "requested_at": "2026-08-13T02:00:07+08:00",
+  "requested_by": "ChatGPT_A4_Automation_SelfTest",
+  "reason": "scheduled_watchdog_path_selftest",
+  "attempt": 2
 }
