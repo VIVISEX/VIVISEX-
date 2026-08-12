@@ -66,6 +66,21 @@ jobs:
           fi
 
           DATE_TW=$(TZ=Asia/Taipei date +%F)
+
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            HH=$(TZ=Asia/Taipei date +%H)
+            MM=$(TZ=Asia/Taipei date +%M)
+            NOW_MIN=$((10#$HH * 60 + 10#$MM))
+            RECOVERY_START=$((8 * 60 + 25))
+            RECOVERY_END=$((8 * 60 + 35))
+            if [ "$NOW_MIN" -lt "$RECOVERY_START" ] || [ "$NOW_MIN" -gt "$RECOVERY_END" ]; then
+              echo "should_run=false" >> "$GITHUB_OUTPUT"
+              echo "reason=outside_recovery_window" >> "$GITHUB_OUTPUT"
+              echo "Recovery push ignored outside 08:25-08:35 Asia/Taipei."
+              exit 0
+            fi
+          fi
+
           git fetch origin "$DEFAULT_BRANCH" --quiet
           COMPLETED_PATH="status/a4/${DATE_TW}_COMPLETED.json"
 
