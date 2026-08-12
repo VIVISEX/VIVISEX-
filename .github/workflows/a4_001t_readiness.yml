@@ -59,6 +59,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install pandas requests pyarrow
 
+      - name: Run A4_001G trading-day gate tests
+        id: gate_test
+        continue-on-error: true
+        run: |
+          python A4_001G_TradingDayGateTest.py
+
       - name: Run A4_001T readiness
         id: readiness
         continue-on-error: true
@@ -78,6 +84,7 @@ jobs:
         if: always()
         env:
           READINESS_OUTCOME: ${{ steps.readiness.outcome }}
+          GATE_TEST_OUTCOME: ${{ steps.gate_test.outcome }}
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
           SHA: ${{ github.sha }}
@@ -92,6 +99,7 @@ jobs:
 
           if [ -f "$REPORT" ]; then
             jq --arg workflow_outcome "$READINESS_OUTCOME" \
+               --arg gate_test_outcome "$GATE_TEST_OUTCOME" \
                --arg checked_at "$NOW_TW" \
                --arg run_id "$RUN_ID" \
                --arg run_attempt "$RUN_ATTEMPT" \
@@ -99,19 +107,21 @@ jobs:
                --arg sha "$SHA" \
                '. + {
                  workflow_outcome: $workflow_outcome,
+                 gate_test_outcome: $gate_test_outcome,
                  checked_at: $checked_at,
                  run_id: $run_id,
                  run_attempt: $run_attempt,
                  event_name: $event_name,
                  source_commit: $sha,
-                 pass: ((.pass == true) and ($workflow_outcome == "success"))
+                 pass: ((.pass == true) and ($workflow_outcome == "success") and ($gate_test_outcome == "success"))
                }' "$REPORT" > status/a4/readiness_latest.json
           else
             jq -n --arg checked_at "$NOW_TW" \
                   --arg workflow_outcome "$READINESS_OUTCOME" \
+                  --arg gate_test_outcome "$GATE_TEST_OUTCOME" \
                   --arg run_id "$RUN_ID" \
                   --arg sha "$SHA" \
-                  '{component:"A4_001T", pass:false, reason:"NO_READINESS_REPORT", checked_at:$checked_at, workflow_outcome:$workflow_outcome, run_id:$run_id, source_commit:$sha}' \
+                  '{component:"A4_001T", pass:false, reason:"NO_READINESS_REPORT", checked_at:$checked_at, workflow_outcome:$workflow_outcome, gate_test_outcome:$gate_test_outcome, run_id:$run_id, source_commit:$sha}' \
                   > status/a4/readiness_latest.json
           fi
 
@@ -127,6 +137,10 @@ jobs:
       - name: Enforce readiness result
         if: always()
         run: |
+          if [ "${{ steps.gate_test.outcome }}" != "success" ]; then
+            echo "A4_001G trading-day gate tests failed"
+            exit 1
+          fi
           if [ "${{ steps.readiness.outcome }}" != "success" ]; then
             echo "A4_001T readiness failed"
             exit 1
