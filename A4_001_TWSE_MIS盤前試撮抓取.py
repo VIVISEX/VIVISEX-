@@ -7,6 +7,7 @@ import os
 import random
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, time as dtime
 from pathlib import Path
@@ -37,6 +38,9 @@ REQUEST_TIMEOUT = max(2.0, float(os.getenv("REQUEST_TIMEOUT", "5")))
 RETRY_BASE_SECONDS = max(0.05, float(os.getenv("RETRY_BASE_SECONDS", "0.35")))
 RETRY_CAP_SECONDS = max(RETRY_BASE_SECONDS, float(os.getenv("RETRY_CAP_SECONDS", "2.0")))
 WARMUP_TIMEOUT = max(1.0, float(os.getenv("WARMUP_TIMEOUT", "4")))
+SINGLE_FALLBACK_RETRIES = max(1, int(os.getenv("SINGLE_FALLBACK_RETRIES", "2")))
+SINGLE_FALLBACK_TIMEOUT = max(2.0, float(os.getenv("SINGLE_FALLBACK_TIMEOUT", "4")))
+ENABLE_SINGLE_FALLBACK = os.getenv("ENABLE_SINGLE_FALLBACK", "1").strip().lower() not in {"0", "false", "no"}
 SOURCE_GAP_CONSECUTIVE_CYCLES = max(1, int(os.getenv("SOURCE_GAP_CONSECUTIVE_CYCLES", "3")))
 MAX_REQUEST_ERROR_RATE = min(1.0, max(0.0, float(os.getenv("MAX_REQUEST_ERROR_RATE", "0.02"))))
 MIN_PREOPEN_COVERAGE = min(1.0, max(0.0, float(os.getenv("MIN_PREOPEN_COVERAGE", "0.98"))))
@@ -112,10 +116,10 @@ def chunks(seq: list[Stock], n: int):
 
 
 def make_session(warmup: bool = True) -> requests.Session:
-    s = requests.Session()
-    s.headers.update(
+    session = requests.Session()
+    session.headers.update(
         {
-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/151 Safari/537.36 QTS-A4/1.2",
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/151 Safari/537.36 QTS-A4/1.3",
             "Accept": "application/json,text/plain,*/*",
             "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.7",
             "Referer": MIS_FIBEST_URL,
@@ -125,8 +129,8 @@ def make_session(warmup: bool = True) -> requests.Session:
         }
     )
     if warmup:
-        warmup_session(s)
-    return s
+        warmup_session(session)
+    return session
 
 
 def warmup_session(session: requests.Session) -> dict[str, Any]:
@@ -148,19 +152,24 @@ def _retry_sleep(attempt: int) -> None:
     time.sleep(base + random.uniform(0.0, min(0.25, RETRY_BASE_SECONDS)))
 
 
-def fetch_batch(session: requests.Session, batch: list[Stock]) -> dict[str, Any]:
+def _fetch_core(
+    session: requests.Session,
+    batch: list[Stock],
+    max_retries: int,
+    request_timeout: float,
+) -> dict[str, Any]:
     last: Exception | None = None
     active_session = session
 
-    for attempt in range(1, MAX_RETRIES + 1):
+    for attempt in range(1, max_retries + 1):
         params = {
-            "ex_ch": "|".join(s.ex_ch for s in batch),
+            "ex_ch": "|".join(stock.ex_ch for stock in batch),
             "json": "1",
             "delay": "0",
             "_": str(int(time.time() * 1000)),
         }
         try:
-            response = active_session.get(MIS_URL, params=params, timeout=REQUEST_TIMEOUT)
+            response = active_session.get(MIS_URL, params=params, timeout=request_timeout)
             if response.status_code in RETRYABLE_HTTP:
                 raise requests.HTTPError(
                     f"retryable HTTP {response.status_code}", response=response
@@ -178,7 +187,7 @@ def fetch_batch(session: requests.Session, batch: list[Stock]) -> dict[str, Any]
             last = exc
             status = getattr(getattr(exc, "response", None), "status_code", None)
             non_retryable_http = status is not None and status not in RETRYABLE_HTTP
-            if non_retryable_http or attempt >= MAX_RETRIES:
+            if non_retryable_http or attempt >= max_retries:
                 break
 
             if attempt >= 2:
@@ -186,12 +195,93 @@ def fetch_batch(session: requests.Session, batch: list[Stock]) -> dict[str, Any]
                     active_session.close()
                 except Exception:
                     pass
-                active_session = make_session(warmup=True)
+                active_session = make_session(warmup=False)
             _retry_sleep(attempt)
 
     raise RuntimeError(
-        f"SOURCE_GAP: MIS request failed after {MAX_RETRIES} attempts; last={type(last).__name__ if last else 'Unknown'}: {last}"
+        f"MIS request failed after {max_retries} attempts; symbols={[s.code for s in batch]}; "
+        f"last={type(last).__name__ if last else 'Unknown'}: {last}"
     )
+
+
+def _single_symbol_fetch(stock: Stock) -> tuple[str, dict[str, Any]]:
+    session = make_session(warmup=False)
+    try:
+        raw = _fetch_core(
+            session,
+            [stock],
+            max_retries=SINGLE_FALLBACK_RETRIES,
+            request_timeout=SINGLE_FALLBACK_TIMEOUT,
+        )
+        return stock.code, raw
+    finally:
+        session.close()
+
+
+def _merge_single_results(batch: list[Stock], results: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    merged_items: list[dict[str, Any]] = []
+    query_time: dict[str, Any] = {}
+    for stock in batch:
+        raw = results[stock.code]
+        items = raw.get("msgArray", []) or []
+        matched = [item for item in items if str(item.get("c", "")) == stock.code]
+        if not matched:
+            raise RuntimeError(f"single fallback missing requested symbol={stock.code}")
+        merged_items.extend(matched)
+        if isinstance(raw.get("queryTime"), dict):
+            query_time = raw["queryTime"]
+
+    return {
+        "rtcode": "0000",
+        "rtmessage": "OK",
+        "msgArray": merged_items,
+        "queryTime": query_time,
+        "_qts_transport": {
+            "mode": "single_symbol_parallel_fallback",
+            "symbols": [stock.code for stock in batch],
+            "parts": len(batch),
+        },
+    }
+
+
+def fetch_batch(session: requests.Session, batch: list[Stock]) -> dict[str, Any]:
+    try:
+        raw = _fetch_core(
+            session,
+            batch,
+            max_retries=MAX_RETRIES,
+            request_timeout=REQUEST_TIMEOUT,
+        )
+        raw.setdefault(
+            "_qts_transport",
+            {"mode": "batch", "symbols": [stock.code for stock in batch], "parts": 1},
+        )
+        return raw
+    except Exception as primary_error:
+        if not ENABLE_SINGLE_FALLBACK or len(batch) <= 1:
+            raise RuntimeError(f"SOURCE_GAP: {primary_error}") from primary_error
+
+        results: dict[str, dict[str, Any]] = {}
+        failures: dict[str, str] = {}
+        workers = min(5, len(batch))
+        with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="a4-mis") as executor:
+            future_map = {executor.submit(_single_symbol_fetch, stock): stock for stock in batch}
+            for future in as_completed(future_map):
+                stock = future_map[future]
+                try:
+                    code, raw = future.result()
+                    results[code] = raw
+                except Exception as exc:
+                    failures[stock.code] = f"{type(exc).__name__}: {exc}"
+
+        if failures or len(results) != len(batch):
+            missing = sorted({stock.code for stock in batch} - set(results))
+            raise RuntimeError(
+                "SOURCE_GAP: batch request failed and single-symbol fallback incomplete; "
+                f"primary={primary_error}; failures={failures}; missing={missing}"
+            ) from primary_error
+
+        return _merge_single_results(batch, results)
 
 
 def phase_for(t: dtime) -> str:
@@ -269,7 +359,7 @@ def run_env_test(stocks: list[Stock]) -> int:
     errors: list[str] = []
     items: list[dict[str, Any]] = []
     raws: list[dict[str, Any]] = []
-    requested_codes = {s.code for s in stocks}
+    requested_codes = {stock.code for stock in stocks}
 
     for batch in chunks(stocks, BATCH_SIZE):
         try:
@@ -301,6 +391,7 @@ def run_env_test(stocks: list[Stock]) -> int:
         "unexpected_symbols": unexpected_symbols,
         "errors": errors,
         "source_gap": bool(errors),
+        "transport_modes": [raw.get("_qts_transport", {}).get("mode") for raw in raws],
         "pass": passed,
     }
     atomic_write_json(OUTPUT_DIR / "env_test_report.json", report)
@@ -376,6 +467,7 @@ def run_live(stocks: list[Stock]) -> int:
     incomplete_cycle_count = 0
     preopen_rows = 0
     open_rows = 0
+    transport_fallback_count = 0
     preopen_valid_cycles: list[datetime] = []
     open_valid_cycles: list[datetime] = []
     all_valid_cycles: list[datetime] = []
@@ -384,7 +476,7 @@ def run_live(stocks: list[Stock]) -> int:
     min_observed_symbol_coverage = 1.0
     consecutive_failed_cycles = 0
     max_consecutive_failed_cycles = 0
-    requested_codes = {s.code for s in stocks}
+    requested_codes = {stock.code for stock in stocks}
     minimum_symbols_per_cycle = max(1, math.ceil(len(requested_codes) * MIN_SYMBOL_COVERAGE))
 
     next_poll = time.monotonic()
@@ -408,10 +500,14 @@ def run_live(stocks: list[Stock]) -> int:
                 request_count += 1
                 try:
                     raw = fetch_batch(session, batch)
+                    transport_mode = raw.get("_qts_transport", {}).get("mode", "batch")
+                    if transport_mode != "batch":
+                        transport_fallback_count += 1
                     envelope = {
                         "captured_at": captured.isoformat(timespec="milliseconds"),
                         "phase": phase,
-                        "request_symbols": [s.ex_ch for s in batch],
+                        "request_symbols": [stock.ex_ch for stock in batch],
+                        "transport_mode": transport_mode,
                         "raw": raw,
                     }
                     raw_file.write(json.dumps(envelope, ensure_ascii=False) + "\n")
@@ -492,6 +588,7 @@ def run_live(stocks: list[Stock]) -> int:
                     "source_gap": source_gap_active,
                     "consecutive_failed_cycles": consecutive_failed_cycles,
                     "max_consecutive_failed_cycles": max_consecutive_failed_cycles,
+                    "transport_fallback_count": transport_fallback_count,
                     "returned_symbols": len(returned_codes_this_cycle & requested_codes),
                     "fresh_symbols": len(fresh_codes_this_cycle & requested_codes),
                     "requested_symbols": len(requested_codes),
@@ -562,6 +659,7 @@ def run_live(stocks: list[Stock]) -> int:
         "error_count": error_count,
         "request_error_rate": request_error_rate,
         "allowed_request_error_rate": MAX_REQUEST_ERROR_RATE,
+        "transport_fallback_count": transport_fallback_count,
         "empty_response_count": empty_count,
         "stale_row_count": stale_row_count,
         "incomplete_cycle_count": incomplete_cycle_count,
