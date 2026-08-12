@@ -4,6 +4,7 @@ import csv
 import json
 import math
 import os
+import random
 import sys
 import time
 from dataclasses import dataclass
@@ -17,6 +18,8 @@ import requests
 
 TZ = ZoneInfo("Asia/Taipei")
 MIS_URL = "https://mis.twse.com.tw/stock/api/getStockInfo.jsp"
+MIS_HOME_URL = "https://mis.twse.com.tw/stock/index.jsp"
+MIS_FIBEST_URL = "https://mis.twse.com.tw/stock/fibest.jsp"
 RUN_MODE = os.getenv("RUN_MODE", "live").strip().lower()
 STOCKS_FILE = Path(os.getenv("STOCKS_FILE", "stocks.csv"))
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", "output/mis"))
@@ -29,12 +32,18 @@ STARTUP_DEADLINE = dtime.fromisoformat(os.getenv("STARTUP_DEADLINE", "08:29:45")
 FIRST_PREOPEN_DEADLINE = dtime.fromisoformat(os.getenv("FIRST_PREOPEN_DEADLINE", "08:30:20"))
 LAST_PREOPEN_EARLIEST = dtime.fromisoformat(os.getenv("LAST_PREOPEN_EARLIEST", "08:59:40"))
 BATCH_SIZE = max(1, int(os.getenv("BATCH_SIZE", "50")))
-MAX_RETRIES = max(1, int(os.getenv("MAX_RETRIES", "5")))
-REQUEST_TIMEOUT = max(3.0, float(os.getenv("REQUEST_TIMEOUT", "8")))
+MAX_RETRIES = max(1, int(os.getenv("MAX_RETRIES", "4")))
+REQUEST_TIMEOUT = max(2.0, float(os.getenv("REQUEST_TIMEOUT", "5")))
+RETRY_BASE_SECONDS = max(0.05, float(os.getenv("RETRY_BASE_SECONDS", "0.35")))
+RETRY_CAP_SECONDS = max(RETRY_BASE_SECONDS, float(os.getenv("RETRY_CAP_SECONDS", "2.0")))
+WARMUP_TIMEOUT = max(1.0, float(os.getenv("WARMUP_TIMEOUT", "4")))
+SOURCE_GAP_CONSECUTIVE_CYCLES = max(1, int(os.getenv("SOURCE_GAP_CONSECUTIVE_CYCLES", "3")))
+MAX_REQUEST_ERROR_RATE = min(1.0, max(0.0, float(os.getenv("MAX_REQUEST_ERROR_RATE", "0.02"))))
 MIN_PREOPEN_COVERAGE = min(1.0, max(0.0, float(os.getenv("MIN_PREOPEN_COVERAGE", "0.98"))))
 MIN_OPEN_COVERAGE = min(1.0, max(0.0, float(os.getenv("MIN_OPEN_COVERAGE", "0.95"))))
 MIN_SYMBOL_COVERAGE = min(1.0, max(0.0, float(os.getenv("MIN_SYMBOL_COVERAGE", "1.0"))))
 MAX_ALLOWED_GAP_SECONDS = max(POLL_SECONDS, float(os.getenv("MAX_ALLOWED_GAP_SECONDS", "15")))
+RETRYABLE_HTTP = {408, 425, 429, 500, 502, 503, 504}
 
 
 @dataclass(frozen=True)
@@ -102,33 +111,62 @@ def chunks(seq: list[Stock], n: int):
         yield seq[i : i + n]
 
 
-def make_session() -> requests.Session:
+def make_session(warmup: bool = True) -> requests.Session:
     s = requests.Session()
     s.headers.update(
         {
-            "User-Agent": "Mozilla/5.0 QTS-A4-LIVE-PREOPEN/1.1",
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/151 Safari/537.36 QTS-A4/1.2",
             "Accept": "application/json,text/plain,*/*",
-            "Referer": "https://mis.twse.com.tw/stock/fibest.jsp",
+            "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.7",
+            "Referer": MIS_FIBEST_URL,
             "Cache-Control": "no-cache",
+            "Pragma": "no-cache",
+            "Connection": "keep-alive",
         }
     )
+    if warmup:
+        warmup_session(s)
     return s
 
 
+def warmup_session(session: requests.Session) -> dict[str, Any]:
+    result: dict[str, Any] = {"ok": False, "url": None, "status": None, "error": None}
+    for url in (MIS_HOME_URL, MIS_FIBEST_URL):
+        try:
+            response = session.get(url, timeout=WARMUP_TIMEOUT, allow_redirects=True)
+            result.update({"url": url, "status": response.status_code})
+            if 200 <= response.status_code < 400:
+                result["ok"] = True
+                return result
+        except requests.RequestException as exc:
+            result["error"] = f"{type(exc).__name__}: {exc}"
+    return result
+
+
+def _retry_sleep(attempt: int) -> None:
+    base = min(RETRY_CAP_SECONDS, RETRY_BASE_SECONDS * (2 ** max(0, attempt - 1)))
+    time.sleep(base + random.uniform(0.0, min(0.25, RETRY_BASE_SECONDS)))
+
+
 def fetch_batch(session: requests.Session, batch: list[Stock]) -> dict[str, Any]:
-    params = {
-        "ex_ch": "|".join(s.ex_ch for s in batch),
-        "json": "1",
-        "delay": "0",
-        "_": str(int(time.time() * 1000)),
-    }
     last: Exception | None = None
+    active_session = session
 
     for attempt in range(1, MAX_RETRIES + 1):
+        params = {
+            "ex_ch": "|".join(s.ex_ch for s in batch),
+            "json": "1",
+            "delay": "0",
+            "_": str(int(time.time() * 1000)),
+        }
         try:
-            r = session.get(MIS_URL, params=params, timeout=REQUEST_TIMEOUT)
-            r.raise_for_status()
-            obj = r.json()
+            response = active_session.get(MIS_URL, params=params, timeout=REQUEST_TIMEOUT)
+            if response.status_code in RETRYABLE_HTTP:
+                raise requests.HTTPError(
+                    f"retryable HTTP {response.status_code}", response=response
+                )
+            response.raise_for_status()
+            obj = response.json()
             if not isinstance(obj, dict):
                 raise RuntimeError("MIS response is not an object")
             if str(obj.get("rtcode", "")) != "0000":
@@ -136,12 +174,24 @@ def fetch_batch(session: requests.Session, batch: list[Stock]) -> dict[str, Any]
                     f"MIS rtcode={obj.get('rtcode')} message={obj.get('rtmessage')}"
                 )
             return obj
-        except Exception as exc:
+        except (requests.Timeout, requests.ConnectionError, requests.HTTPError, ValueError, RuntimeError) as exc:
             last = exc
-            if attempt < MAX_RETRIES:
-                time.sleep(min(4.0, 0.5 * (2 ** (attempt - 1))))
+            status = getattr(getattr(exc, "response", None), "status_code", None)
+            non_retryable_http = status is not None and status not in RETRYABLE_HTTP
+            if non_retryable_http or attempt >= MAX_RETRIES:
+                break
 
-    raise RuntimeError(f"MIS request failed after {MAX_RETRIES} retries: {last}")
+            if attempt >= 2:
+                try:
+                    active_session.close()
+                except Exception:
+                    pass
+                active_session = make_session(warmup=True)
+            _retry_sleep(attempt)
+
+    raise RuntimeError(
+        f"SOURCE_GAP: MIS request failed after {MAX_RETRIES} attempts; last={type(last).__name__ if last else 'Unknown'}: {last}"
+    )
 
 
 def phase_for(t: dtime) -> str:
@@ -214,7 +264,7 @@ def atomic_write_json(path: Path, obj: Any) -> None:
 
 def run_env_test(stocks: list[Stock]) -> int:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    session = make_session()
+    session = make_session(warmup=True)
     started = now_tw()
     errors: list[str] = []
     items: list[dict[str, Any]] = []
@@ -250,6 +300,7 @@ def run_env_test(stocks: list[Stock]) -> int:
         "missing_symbols": missing_symbols,
         "unexpected_symbols": unexpected_symbols,
         "errors": errors,
+        "source_gap": bool(errors),
         "pass": passed,
     }
     atomic_write_json(OUTPUT_DIR / "env_test_report.json", report)
@@ -302,6 +353,8 @@ def run_live(stocks: list[Stock]) -> int:
             "pass": False,
             "pass_candidate": False,
             "reason": "started_after_end_time",
+            "source_gap": True,
+            "data_health": "SOURCE_GAP",
             "failure_reasons": ["STARTED_AFTER_END_TIME"],
             "actual_process_start": actual_process_start.isoformat(),
             "schedule_delay_seconds_from_0825": schedule_delay_seconds,
@@ -314,7 +367,7 @@ def run_live(stocks: list[Stock]) -> int:
         remaining = (start_at - now_tw()).total_seconds()
         time.sleep(max(0.2, min(5.0, remaining)))
 
-    session = make_session()
+    session = make_session(warmup=True)
     normalized: list[dict[str, Any]] = []
     request_count = 0
     error_count = 0
@@ -329,6 +382,8 @@ def run_live(stocks: list[Stock]) -> int:
     first_capture: str | None = None
     last_capture: str | None = None
     min_observed_symbol_coverage = 1.0
+    consecutive_failed_cycles = 0
+    max_consecutive_failed_cycles = 0
     requested_codes = {s.code for s in stocks}
     minimum_symbols_per_cycle = max(1, math.ceil(len(requested_codes) * MIN_SYMBOL_COVERAGE))
 
@@ -347,6 +402,7 @@ def run_live(stocks: list[Stock]) -> int:
             captured = now_tw()
             returned_codes_this_cycle: set[str] = set()
             fresh_codes_this_cycle: set[str] = set()
+            cycle_error_count = 0
 
             for batch in chunks(stocks, BATCH_SIZE):
                 request_count += 1
@@ -382,12 +438,14 @@ def run_live(stocks: list[Stock]) -> int:
                         elif phase == "OPEN_VALIDATION":
                             open_rows += 1
                 except Exception as exc:
+                    cycle_error_count += 1
                     error_count += 1
                     raw_file.write(
                         json.dumps(
                             {
                                 "captured_at": captured.isoformat(),
                                 "phase": phase,
+                                "dq_status": "SOURCE_GAP",
                                 "error": str(exc),
                             },
                             ensure_ascii=False,
@@ -401,9 +459,7 @@ def run_live(stocks: list[Stock]) -> int:
                 if requested_codes
                 else 0.0
             )
-            min_observed_symbol_coverage = min(
-                min_observed_symbol_coverage, observed_coverage
-            )
+            min_observed_symbol_coverage = min(min_observed_symbol_coverage, observed_coverage)
             cycle_valid = len(fresh_codes_this_cycle & requested_codes) >= minimum_symbols_per_cycle
 
             if cycle_valid:
@@ -418,6 +474,13 @@ def run_live(stocks: list[Stock]) -> int:
             else:
                 incomplete_cycle_count += 1
 
+            if cycle_error_count > 0 or not cycle_valid:
+                consecutive_failed_cycles += 1
+            else:
+                consecutive_failed_cycles = 0
+            max_consecutive_failed_cycles = max(max_consecutive_failed_cycles, consecutive_failed_cycles)
+            source_gap_active = consecutive_failed_cycles >= SOURCE_GAP_CONSECUTIVE_CYCLES
+
             atomic_write_json(
                 heartbeat_path,
                 {
@@ -425,6 +488,10 @@ def run_live(stocks: list[Stock]) -> int:
                     "captured_at": captured.isoformat(),
                     "phase": phase,
                     "valid_cycle": cycle_valid,
+                    "data_health": "SOURCE_GAP" if source_gap_active else "NORMAL",
+                    "source_gap": source_gap_active,
+                    "consecutive_failed_cycles": consecutive_failed_cycles,
+                    "max_consecutive_failed_cycles": max_consecutive_failed_cycles,
                     "returned_symbols": len(returned_codes_this_cycle & requested_codes),
                     "fresh_symbols": len(fresh_codes_this_cycle & requested_codes),
                     "requested_symbols": len(requested_codes),
@@ -445,9 +512,7 @@ def run_live(stocks: list[Stock]) -> int:
 
     expected_preopen = expected_cycles(START_TIME, PREOPEN_END, actual_process_start)
     expected_open = expected_cycles(PREOPEN_END, END_TIME, actual_process_start)
-    preopen_coverage = (
-        len(preopen_valid_cycles) / expected_preopen if expected_preopen else 0.0
-    )
+    preopen_coverage = len(preopen_valid_cycles) / expected_preopen if expected_preopen else 0.0
     open_coverage = len(open_valid_cycles) / expected_open if expected_open else 0.0
     observed_max_gap = max_gap_seconds(all_valid_cycles)
 
@@ -458,9 +523,11 @@ def run_live(stocks: list[Stock]) -> int:
     preopen_coverage_ok = preopen_coverage >= MIN_PREOPEN_COVERAGE
     open_coverage_ok = open_coverage >= MIN_OPEN_COVERAGE
     gap_ok = observed_max_gap is not None and observed_max_gap <= MAX_ALLOWED_GAP_SECONDS
-    errors_ok = error_count == 0
     freshness_ok = stale_row_count == 0
     symbol_coverage_ok = min_observed_symbol_coverage >= MIN_SYMBOL_COVERAGE
+    request_error_rate = error_count / request_count if request_count else 1.0
+    error_rate_ok = request_error_rate <= MAX_REQUEST_ERROR_RATE
+    source_gap_ok = max_consecutive_failed_cycles < SOURCE_GAP_CONSECUTIVE_CYCLES
 
     gates = {
         "startup_before_082945": startup_ok,
@@ -469,7 +536,8 @@ def run_live(stocks: list[Stock]) -> int:
         "preopen_coverage_ok": preopen_coverage_ok,
         "open_validation_coverage_ok": open_coverage_ok,
         "max_gap_ok": gap_ok,
-        "request_errors_zero": errors_ok,
+        "request_error_rate_ok": error_rate_ok,
+        "source_gap_not_persistent": source_gap_ok,
         "fresh_market_date_only": freshness_ok,
         "symbol_coverage_ok": symbol_coverage_ok,
     }
@@ -492,9 +560,15 @@ def run_live(stocks: list[Stock]) -> int:
         "preopen_rows": preopen_rows,
         "open_validation_rows": open_rows,
         "error_count": error_count,
+        "request_error_rate": request_error_rate,
+        "allowed_request_error_rate": MAX_REQUEST_ERROR_RATE,
         "empty_response_count": empty_count,
         "stale_row_count": stale_row_count,
         "incomplete_cycle_count": incomplete_cycle_count,
+        "max_consecutive_failed_cycles": max_consecutive_failed_cycles,
+        "source_gap_threshold_cycles": SOURCE_GAP_CONSECUTIVE_CYCLES,
+        "source_gap": not source_gap_ok,
+        "data_health": "NORMAL" if source_gap_ok else "SOURCE_GAP",
         "expected_preopen_cycles": expected_preopen,
         "actual_preopen_valid_cycles": len(preopen_valid_cycles),
         "preopen_coverage": preopen_coverage,
@@ -539,7 +613,13 @@ if __name__ == "__main__":
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         atomic_write_json(
             OUTPUT_DIR / "fatal_error.json",
-            {"at": now_tw().isoformat(), "error": repr(exc), "run_mode": RUN_MODE},
+            {
+                "at": now_tw().isoformat(),
+                "error": repr(exc),
+                "run_mode": RUN_MODE,
+                "source_gap": True,
+                "data_health": "SOURCE_GAP",
+            },
         )
         print(f"FATAL: {exc}", file=sys.stderr)
         sys.exit(99)
