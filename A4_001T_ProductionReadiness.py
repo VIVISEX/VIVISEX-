@@ -14,6 +14,9 @@ PROD_PATH = ROOT / "A4_001_TWSE_MIS盤前試撮抓取.py"
 FIXTURE_PATH = ROOT / "tests" / "fixtures" / "a4_mis_2026-08-07_5symbols.json"
 OUTPUT_DIR = ROOT / "output" / "readiness"
 TZ = ZoneInfo("Asia/Taipei")
+LIVE_PROBE_ROUNDS = 3
+LIVE_PROBE_MIN_SUCCESS = 2
+LIVE_PROBE_PAUSE_SECONDS = 1.0
 
 
 def load_production_module():
@@ -70,10 +73,18 @@ def main() -> int:
     def production_contract() -> dict[str, Any]:
         require(PROD_PATH.exists(), "production scraper missing")
         require(prod.MIS_URL == "https://mis.twse.com.tw/stock/api/getStockInfo.jsp", "unexpected MIS endpoint")
+        require(prod.SOURCE_GAP_CONSECUTIVE_CYCLES >= 2, "SOURCE_GAP threshold too aggressive")
+        require(prod.MAX_RETRIES >= 3, "retry budget too small")
         stocks = prod.load_stocks(ROOT / "stocks.csv")
         require(len(stocks) == 5, f"expected 5 production symbols, got {len(stocks)}")
         require(len({s.code for s in stocks}) == len(stocks), "duplicate stock code")
-        return {"symbols": [s.code for s in stocks], "endpoint": prod.MIS_URL}
+        return {
+            "symbols": [s.code for s in stocks],
+            "endpoint": prod.MIS_URL,
+            "max_retries": prod.MAX_RETRIES,
+            "source_gap_cycles": prod.SOURCE_GAP_CONSECUTIVE_CYCLES,
+            "max_request_error_rate": prod.MAX_REQUEST_ERROR_RATE,
+        }
 
     def state_machine() -> dict[str, Any]:
         cases = {
@@ -108,52 +119,90 @@ def main() -> int:
             "five_level_complete": True,
         }
 
-    def live_mis_probe() -> dict[str, Any]:
+    def live_mis_resilience_probe() -> dict[str, Any]:
         stocks = prod.load_stocks(ROOT / "stocks.csv")
-        session = prod.make_session()
-        t0 = time.perf_counter()
-        raw = prod.fetch_batch(session, stocks)
-        latency_ms = round((time.perf_counter() - t0) * 1000, 2)
-        require(isinstance(raw, dict), "live MIS response is not object")
-        require(str(raw.get("rtcode", "")) == "0000", f"live MIS rtcode={raw.get('rtcode')}")
-        items = raw.get("msgArray") or []
-        require(items, "live MIS msgArray empty")
-        captured = datetime.now(TZ)
-        rows = [prod.normalize_item(item, captured, "READINESS_LIVE_PROBE") for item in items]
         expected = {s.code for s in stocks}
-        returned = {str(row.get("code")) for row in rows if row.get("code")}
-        require(returned == expected, f"live symbol mismatch expected={sorted(expected)} returned={sorted(returned)}")
-        incomplete = [str(row.get("code")) for row in rows if not five_level_complete(row)]
-        require(not incomplete, f"live five-level incomplete: {incomplete}")
-        market_dates = sorted({str(row.get("market_date")) for row in rows if row.get("market_date")})
-        require(market_dates, "live market_date missing")
-        today_compact = captured.strftime("%Y%m%d")
-        require(all(d <= today_compact for d in market_dates), f"future market date returned: {market_dates}")
-        query_time = raw.get("queryTime") or {}
+        attempts: list[dict[str, Any]] = []
+        success_count = 0
+
+        for round_no in range(1, LIVE_PROBE_ROUNDS + 1):
+            t0 = time.perf_counter()
+            try:
+                session = prod.make_session(warmup=True)
+                raw = prod.fetch_batch(session, stocks)
+                latency_ms = round((time.perf_counter() - t0) * 1000, 2)
+                require(isinstance(raw, dict), "live MIS response is not object")
+                require(str(raw.get("rtcode", "")) == "0000", f"live MIS rtcode={raw.get('rtcode')}")
+                items = raw.get("msgArray") or []
+                require(items, "live MIS msgArray empty")
+                captured = datetime.now(TZ)
+                rows = [prod.normalize_item(item, captured, "READINESS_LIVE_PROBE") for item in items]
+                returned = {str(row.get("code")) for row in rows if row.get("code")}
+                require(returned == expected, f"live symbol mismatch expected={sorted(expected)} returned={sorted(returned)}")
+                incomplete = [str(row.get("code")) for row in rows if not five_level_complete(row)]
+                require(not incomplete, f"live five-level incomplete: {incomplete}")
+                market_dates = sorted({str(row.get("market_date")) for row in rows if row.get("market_date")})
+                require(market_dates, "live market_date missing")
+                today_compact = captured.strftime("%Y%m%d")
+                require(all(d <= today_compact for d in market_dates), f"future market date returned: {market_dates}")
+                query_time = raw.get("queryTime") or {}
+                attempts.append(
+                    {
+                        "round": round_no,
+                        "pass": True,
+                        "latency_ms": latency_ms,
+                        "rows": len(rows),
+                        "market_dates": market_dates,
+                        "query_sys_date": query_time.get("sysDate"),
+                        "query_sys_time": query_time.get("sysTime"),
+                    }
+                )
+                success_count += 1
+            except Exception as exc:
+                attempts.append(
+                    {
+                        "round": round_no,
+                        "pass": False,
+                        "elapsed_ms": round((time.perf_counter() - t0) * 1000, 2),
+                        "error": f"{type(exc).__name__}: {exc}",
+                    }
+                )
+            finally:
+                try:
+                    session.close()
+                except Exception:
+                    pass
+
+            if round_no < LIVE_PROBE_ROUNDS:
+                time.sleep(LIVE_PROBE_PAUSE_SECONDS)
+
+        require(
+            success_count >= LIVE_PROBE_MIN_SUCCESS,
+            f"MIS resilience quorum failed: success={success_count}/{LIVE_PROBE_ROUNDS}; attempts={attempts}",
+        )
         return {
-            "latency_ms": latency_ms,
-            "rows": len(rows),
-            "symbols": sorted(returned),
-            "market_dates": market_dates,
-            "query_sys_date": query_time.get("sysDate"),
-            "query_sys_time": query_time.get("sysTime"),
+            "rounds": LIVE_PROBE_ROUNDS,
+            "required_success": LIVE_PROBE_MIN_SUCCESS,
+            "success_count": success_count,
+            "attempts": attempts,
+            "symbols": sorted(expected),
             "five_level_complete": True,
         }
 
     run("production_contract", production_contract)
     run("phase_state_machine", state_machine)
     run("historical_replay_2026_08_07", historical_replay)
-    run("live_twse_mis_network_probe", live_mis_probe)
+    run("live_twse_mis_resilience_probe", live_mis_resilience_probe)
 
     passed = all(item.get("pass") is True for item in results)
     report = {
         "component": "A4_001T",
-        "purpose": "Production readiness: production parser replay + real GitHub Runner to TWSE MIS connectivity",
+        "purpose": "Production readiness: production parser replay + resilient real GitHub Runner to TWSE MIS probe",
         "started_at": started.isoformat(),
         "finished_at": datetime.now(TZ).isoformat(),
         "pass": passed,
         "tests": results,
-        "scope_note": "This test validates runner, dependencies, endpoint reachability, five-level parsing and historical replay. It does not replace the real 08:30-09:00 pre-open production acceptance test.",
+        "scope_note": "This validates runner, dependencies, endpoint reachability, retry/session recovery, five-level parsing and historical replay. It does not replace the real 08:30-09:00 pre-open production acceptance test.",
     }
     report_path = OUTPUT_DIR / "readiness_report.json"
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
