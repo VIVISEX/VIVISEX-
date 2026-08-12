@@ -1,0 +1,85 @@
+{
+  "component": "A4_001T",
+  "purpose": "Production readiness: production parser replay + real GitHub Runner to TWSE MIS connectivity",
+  "started_at": "2026-08-13T01:46:35.208824+08:00",
+  "finished_at": "2026-08-13T01:46:36.828316+08:00",
+  "pass": true,
+  "tests": [
+    {
+      "name": "production_contract",
+      "pass": true,
+      "elapsed_ms": 13.85,
+      "detail": {
+        "symbols": [
+          "2330",
+          "2317",
+          "2454",
+          "2308",
+          "2382"
+        ],
+        "endpoint": "https://mis.twse.com.tw/stock/api/getStockInfo.jsp"
+      }
+    },
+    {
+      "name": "phase_state_machine",
+      "pass": true,
+      "elapsed_ms": 0.03,
+      "detail": {
+        "observed": {
+          "08:29:59": "WAIT",
+          "08:30:00": "PREOPEN",
+          "08:59:59": "PREOPEN",
+          "09:00:00": "OPEN_VALIDATION",
+          "09:29:59": "OPEN_VALIDATION",
+          "09:30:00": "DONE"
+        }
+      }
+    },
+    {
+      "name": "historical_replay_2026_08_07",
+      "pass": true,
+      "elapsed_ms": 0.28,
+      "detail": {
+        "rows": 5,
+        "symbols": [
+          "2308",
+          "2317",
+          "2330",
+          "2382",
+          "2454"
+        ],
+        "market_date": "20260807",
+        "five_level_complete": true
+      }
+    },
+    {
+      "name": "live_twse_mis_network_probe",
+      "pass": true,
+      "elapsed_ms": 1003.16,
+      "detail": {
+        "latency_ms": 1001.95,
+        "rows": 5,
+        "symbols": [
+          "2308",
+          "2317",
+          "2330",
+          "2382",
+          "2454"
+        ],
+        "market_dates": [
+          "20260812"
+        ],
+        "query_sys_date": "20260813",
+        "query_sys_time": "01:46:36",
+        "five_level_complete": true
+      }
+    }
+  ],
+  "scope_note": "This test validates runner, dependencies, endpoint reachability, five-level parsing and historical replay. It does not replace the real 08:30-09:00 pre-open production acceptance test.",
+  "workflow_outcome": "success",
+  "checked_at": "2026-08-13T01:46:37+08:00",
+  "run_id": "31624296387",
+  "run_attempt": "1",
+  "event_name": "push",
+  "source_commit": "4a88f6bbebf97dea6c1a01ad5671f720f7c0a58b"
+}
