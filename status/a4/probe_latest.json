@@ -1,0 +1,17 @@
+{
+  "mode": "env_test",
+  "started_at": "2026-08-13T01:36:03.135811+08:00",
+  "finished_at": "2026-08-13T01:36:03.842298+08:00",
+  "requested_symbols": 5,
+  "normalized_rows": 5,
+  "errors": [],
+  "pass": true,
+  "component": "A4_001_DIAG",
+  "checked_at": "2026-08-13T01:36:03+08:00",
+  "workflow_outcome": "success",
+  "run_id": "31623406455",
+  "run_attempt": "1",
+  "source_commit": "588e20f697ca7677a5c96f05f443742100a2ba7a",
+  "raw_file": "output/mis_probe/env_test_raw.json",
+  "transport_pass": true
+}
