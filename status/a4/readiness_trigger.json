@@ -1,7 +1,7 @@
 {
   "component": "A4_001T",
-  "requested_at": "2026-08-13T02:07:00+08:00",
+  "requested_at": "2026-08-13T02:08:22+08:00",
   "requested_by": "ChatGPT_A4_Production_Hardening",
-  "reason": "retest_hardened_mis_transport",
-  "attempt": 3
+  "reason": "verify_exact_production_network_policy",
+  "attempt": 4
 }
