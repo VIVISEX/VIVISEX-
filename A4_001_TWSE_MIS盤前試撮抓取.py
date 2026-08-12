@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 import os
 import sys
 import time
@@ -20,12 +21,20 @@ RUN_MODE = os.getenv("RUN_MODE", "live").strip().lower()
 STOCKS_FILE = Path(os.getenv("STOCKS_FILE", "stocks.csv"))
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", "output/mis"))
 POLL_SECONDS = max(1.0, float(os.getenv("POLL_SECONDS", "5")))
+ARM_TIME = dtime.fromisoformat(os.getenv("ARM_TIME", "08:25:00"))
 START_TIME = dtime.fromisoformat(os.getenv("START_TIME", "08:30:00"))
 PREOPEN_END = dtime.fromisoformat(os.getenv("PREOPEN_END", "09:00:00"))
 END_TIME = dtime.fromisoformat(os.getenv("END_TIME", "09:30:00"))
+STARTUP_DEADLINE = dtime.fromisoformat(os.getenv("STARTUP_DEADLINE", "08:29:45"))
+FIRST_PREOPEN_DEADLINE = dtime.fromisoformat(os.getenv("FIRST_PREOPEN_DEADLINE", "08:30:20"))
+LAST_PREOPEN_EARLIEST = dtime.fromisoformat(os.getenv("LAST_PREOPEN_EARLIEST", "08:59:40"))
 BATCH_SIZE = max(1, int(os.getenv("BATCH_SIZE", "50")))
 MAX_RETRIES = max(1, int(os.getenv("MAX_RETRIES", "5")))
 REQUEST_TIMEOUT = max(3.0, float(os.getenv("REQUEST_TIMEOUT", "8")))
+MIN_PREOPEN_COVERAGE = min(1.0, max(0.0, float(os.getenv("MIN_PREOPEN_COVERAGE", "0.98"))))
+MIN_OPEN_COVERAGE = min(1.0, max(0.0, float(os.getenv("MIN_OPEN_COVERAGE", "0.95"))))
+MIN_SYMBOL_COVERAGE = min(1.0, max(0.0, float(os.getenv("MIN_SYMBOL_COVERAGE", "1.0"))))
+MAX_ALLOWED_GAP_SECONDS = max(POLL_SECONDS, float(os.getenv("MAX_ALLOWED_GAP_SECONDS", "15")))
 
 
 @dataclass(frozen=True)
@@ -37,6 +46,11 @@ class Stock:
 
 def now_tw() -> datetime:
     return datetime.now(TZ)
+
+
+def combine_today(t: dtime, base: datetime | None = None) -> datetime:
+    base = base or now_tw()
+    return datetime.combine(base.date(), t, TZ)
 
 
 def parse_levels(value: Any, cast=float) -> list[Any]:
@@ -57,7 +71,9 @@ def parse_levels(value: Any, cast=float) -> list[Any]:
 def load_stocks(path: Path) -> list[Stock]:
     if not path.exists():
         raise FileNotFoundError(f"stocks file not found: {path}")
+
     stocks: list[Stock] = []
+    seen: set[tuple[str, str]] = set()
     with path.open("r", encoding="utf-8-sig", newline="") as f:
         for row in csv.DictReader(f):
             code = str(row.get("code", "")).strip()
@@ -65,10 +81,17 @@ def load_stocks(path: Path) -> list[Stock]:
             ex_ch = str(row.get("ex_ch", "")).strip()
             if not code:
                 continue
+            if market not in {"TSE", "OTC"}:
+                raise ValueError(f"unsupported market={market} for code={code}")
+            key = (market, code)
+            if key in seen:
+                continue
+            seen.add(key)
             if not ex_ch:
                 prefix = "tse" if market == "TSE" else "otc"
                 ex_ch = f"{prefix}_{code}.tw"
             stocks.append(Stock(market=market, code=code, ex_ch=ex_ch))
+
     if not stocks:
         raise RuntimeError("stocks.csv contains no valid symbols")
     return stocks
@@ -83,7 +106,7 @@ def make_session() -> requests.Session:
     s = requests.Session()
     s.headers.update(
         {
-            "User-Agent": "Mozilla/5.0 QTS-A4-LIVE-PREOPEN/1.0",
+            "User-Agent": "Mozilla/5.0 QTS-A4-LIVE-PREOPEN/1.1",
             "Accept": "application/json,text/plain,*/*",
             "Referer": "https://mis.twse.com.tw/stock/fibest.jsp",
             "Cache-Control": "no-cache",
@@ -100,6 +123,7 @@ def fetch_batch(session: requests.Session, batch: list[Stock]) -> dict[str, Any]
         "_": str(int(time.time() * 1000)),
     }
     last: Exception | None = None
+
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             r = session.get(MIS_URL, params=params, timeout=REQUEST_TIMEOUT)
@@ -107,11 +131,16 @@ def fetch_batch(session: requests.Session, batch: list[Stock]) -> dict[str, Any]
             obj = r.json()
             if not isinstance(obj, dict):
                 raise RuntimeError("MIS response is not an object")
+            if str(obj.get("rtcode", "")) != "0000":
+                raise RuntimeError(
+                    f"MIS rtcode={obj.get('rtcode')} message={obj.get('rtmessage')}"
+                )
             return obj
         except Exception as exc:
             last = exc
             if attempt < MAX_RETRIES:
                 time.sleep(min(4.0, 0.5 * (2 ** (attempt - 1))))
+
     raise RuntimeError(f"MIS request failed after {MAX_RETRIES} retries: {last}")
 
 
@@ -120,7 +149,7 @@ def phase_for(t: dtime) -> str:
         return "WAIT"
     if t < PREOPEN_END:
         return "PREOPEN"
-    if t <= END_TIME:
+    if t < END_TIME:
         return "OPEN_VALIDATION"
     return "DONE"
 
@@ -139,6 +168,7 @@ def normalize_item(item: dict[str, Any], captured_at: datetime, phase: str) -> d
         "name": str(item.get("n", "")),
         "market_date": str(item.get("d", "")),
         "market_time": str(item.get("t", "")),
+        "exchange_time": str(item.get("%", "")),
         "simulated_flag": str(item.get("ts", "")),
         "last_price": item.get("z"),
         "single_volume": item.get("tv"),
@@ -147,6 +177,11 @@ def normalize_item(item: dict[str, Any], captured_at: datetime, phase: str) -> d
         "open": item.get("o"),
         "high": item.get("h"),
         "low": item.get("l"),
+        "raw_pz": item.get("pz"),
+        "raw_ps": item.get("ps"),
+        "raw_oa": item.get("oa"),
+        "raw_ob": item.get("ob"),
+        "raw_ip": item.get("ip"),
         "bid_price_1": bid_price[0] if len(bid_price) > 0 else None,
         "bid_price_2": bid_price[1] if len(bid_price) > 1 else None,
         "bid_price_3": bid_price[2] if len(bid_price) > 2 else None,
@@ -184,6 +219,7 @@ def run_env_test(stocks: list[Stock]) -> int:
     errors: list[str] = []
     items: list[dict[str, Any]] = []
     raws: list[dict[str, Any]] = []
+    requested_codes = {s.code for s in stocks}
 
     for batch in chunks(stocks, BATCH_SIZE):
         try:
@@ -194,60 +230,107 @@ def run_env_test(stocks: list[Stock]) -> int:
         except Exception as exc:
             errors.append(str(exc))
 
+    returned_codes = {str(row.get("code", "")) for row in items if row.get("code")}
+    missing_symbols = sorted(requested_codes - returned_codes)
+    unexpected_symbols = sorted(returned_codes - requested_codes)
+    passed = (
+        not errors
+        and not missing_symbols
+        and not unexpected_symbols
+        and len(returned_codes) == len(requested_codes)
+    )
+
     report = {
         "mode": "env_test",
         "started_at": started.isoformat(),
         "finished_at": now_tw().isoformat(),
         "requested_symbols": len(stocks),
         "normalized_rows": len(items),
+        "returned_symbols": len(returned_codes),
+        "missing_symbols": missing_symbols,
+        "unexpected_symbols": unexpected_symbols,
         "errors": errors,
-        "pass": len(items) > 0 and not errors,
+        "pass": passed,
     }
     atomic_write_json(OUTPUT_DIR / "env_test_report.json", report)
     atomic_write_json(OUTPUT_DIR / "env_test_raw.json", raws)
     if items:
-        pd.DataFrame(items).to_csv(OUTPUT_DIR / "env_test_normalized.csv", index=False, encoding="utf-8-sig")
+        pd.DataFrame(items).to_csv(
+            OUTPUT_DIR / "env_test_normalized.csv", index=False, encoding="utf-8-sig"
+        )
+
     print(json.dumps(report, ensure_ascii=False))
     return 0 if report["pass"] else 2
 
 
+def expected_cycles(start: dtime, end: dtime, base: datetime) -> int:
+    duration = (combine_today(end, base) - combine_today(start, base)).total_seconds()
+    return max(0, int(math.ceil(duration / POLL_SECONDS)))
+
+
+def max_gap_seconds(timestamps: list[datetime]) -> float | None:
+    if len(timestamps) < 2:
+        return None
+    return max((b - a).total_seconds() for a, b in zip(timestamps, timestamps[1:]))
+
+
 def run_live(stocks: list[Stock]) -> int:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    day = now_tw().strftime("%Y-%m-%d")
+    actual_process_start = now_tw()
+    day = actual_process_start.strftime("%Y-%m-%d")
+    day_compact = actual_process_start.strftime("%Y%m%d")
     raw_path = OUTPUT_DIR / f"raw_{day}.ndjson"
     norm_path = OUTPUT_DIR / f"normalized_{day}.parquet"
     csv_path = OUTPUT_DIR / f"normalized_{day}.csv"
     report_path = OUTPUT_DIR / f"report_{day}.json"
+    heartbeat_path = OUTPUT_DIR / f"heartbeat_{day}.json"
 
-    scheduled_start = datetime.combine(now_tw().date(), START_TIME, TZ)
-    actual_process_start = now_tw()
-    schedule_delay_seconds = max(0.0, (actual_process_start - scheduled_start.replace(hour=8, minute=25, second=0)).total_seconds())
+    arm_at = combine_today(ARM_TIME, actual_process_start)
+    start_at = combine_today(START_TIME, actual_process_start)
+    startup_deadline_at = combine_today(STARTUP_DEADLINE, actual_process_start)
+    first_preopen_deadline_at = combine_today(FIRST_PREOPEN_DEADLINE, actual_process_start)
+    last_preopen_earliest_at = combine_today(LAST_PREOPEN_EARLIEST, actual_process_start)
+    end_at = combine_today(END_TIME, actual_process_start)
 
-    while phase_for(now_tw().time()) == "WAIT":
-        remaining = (scheduled_start - now_tw()).total_seconds()
-        time.sleep(max(0.2, min(5.0, remaining)))
+    schedule_delay_seconds = max(0.0, (actual_process_start - arm_at).total_seconds())
+    startup_ok = actual_process_start <= startup_deadline_at
 
-    if phase_for(now_tw().time()) == "DONE":
+    if actual_process_start >= end_at:
         report = {
             "mode": "live",
+            "date": day,
             "pass": False,
+            "pass_candidate": False,
             "reason": "started_after_end_time",
+            "failure_reasons": ["STARTED_AFTER_END_TIME"],
             "actual_process_start": actual_process_start.isoformat(),
+            "schedule_delay_seconds_from_0825": schedule_delay_seconds,
         }
         atomic_write_json(report_path, report)
         print(json.dumps(report, ensure_ascii=False))
         return 3
+
+    while phase_for(now_tw().time()) == "WAIT":
+        remaining = (start_at - now_tw()).total_seconds()
+        time.sleep(max(0.2, min(5.0, remaining)))
 
     session = make_session()
     normalized: list[dict[str, Any]] = []
     request_count = 0
     error_count = 0
     empty_count = 0
+    stale_row_count = 0
+    incomplete_cycle_count = 0
     preopen_rows = 0
     open_rows = 0
+    preopen_valid_cycles: list[datetime] = []
+    open_valid_cycles: list[datetime] = []
+    all_valid_cycles: list[datetime] = []
     first_capture: str | None = None
     last_capture: str | None = None
-    timestamps: list[datetime] = []
+    min_observed_symbol_coverage = 1.0
+    requested_codes = {s.code for s in stocks}
+    minimum_symbols_per_cycle = max(1, math.ceil(len(requested_codes) * MIN_SYMBOL_COVERAGE))
 
     next_poll = time.monotonic()
     with raw_path.open("a", encoding="utf-8") as raw_file:
@@ -262,7 +345,9 @@ def run_live(stocks: list[Stock]) -> int:
                 continue
 
             captured = now_tw()
-            cycle_had_rows = False
+            returned_codes_this_cycle: set[str] = set()
+            fresh_codes_this_cycle: set[str] = set()
+
             for batch in chunks(stocks, BATCH_SIZE):
                 request_count += 1
                 try:
@@ -275,27 +360,79 @@ def run_live(stocks: list[Stock]) -> int:
                     }
                     raw_file.write(json.dumps(envelope, ensure_ascii=False) + "\n")
                     raw_file.flush()
+
                     items = raw.get("msgArray", []) or []
                     if not items:
                         empty_count += 1
+
                     for item in items:
                         row = normalize_item(item, captured, phase)
                         normalized.append(row)
-                        cycle_had_rows = True
+                        code = str(row.get("code", ""))
+                        if code:
+                            returned_codes_this_cycle.add(code)
+                        if str(row.get("market_date", "")) == day_compact:
+                            if code:
+                                fresh_codes_this_cycle.add(code)
+                        else:
+                            stale_row_count += 1
+
                         if phase == "PREOPEN":
                             preopen_rows += 1
                         elif phase == "OPEN_VALIDATION":
                             open_rows += 1
                 except Exception as exc:
                     error_count += 1
-                    raw_file.write(json.dumps({"captured_at": captured.isoformat(), "phase": phase, "error": str(exc)}, ensure_ascii=False) + "\n")
+                    raw_file.write(
+                        json.dumps(
+                            {
+                                "captured_at": captured.isoformat(),
+                                "phase": phase,
+                                "error": str(exc),
+                            },
+                            ensure_ascii=False,
+                        )
+                        + "\n"
+                    )
                     raw_file.flush()
 
-            if cycle_had_rows:
-                timestamps.append(captured)
+            observed_coverage = (
+                len(returned_codes_this_cycle & requested_codes) / len(requested_codes)
+                if requested_codes
+                else 0.0
+            )
+            min_observed_symbol_coverage = min(
+                min_observed_symbol_coverage, observed_coverage
+            )
+            cycle_valid = len(fresh_codes_this_cycle & requested_codes) >= minimum_symbols_per_cycle
+
+            if cycle_valid:
+                all_valid_cycles.append(captured)
                 if first_capture is None:
                     first_capture = captured.isoformat()
                 last_capture = captured.isoformat()
+                if phase == "PREOPEN":
+                    preopen_valid_cycles.append(captured)
+                elif phase == "OPEN_VALIDATION":
+                    open_valid_cycles.append(captured)
+            else:
+                incomplete_cycle_count += 1
+
+            atomic_write_json(
+                heartbeat_path,
+                {
+                    "date": day,
+                    "captured_at": captured.isoformat(),
+                    "phase": phase,
+                    "valid_cycle": cycle_valid,
+                    "returned_symbols": len(returned_codes_this_cycle & requested_codes),
+                    "fresh_symbols": len(fresh_codes_this_cycle & requested_codes),
+                    "requested_symbols": len(requested_codes),
+                    "request_count": request_count,
+                    "error_count": error_count,
+                    "stale_row_count": stale_row_count,
+                },
+            )
 
             next_poll += POLL_SECONDS
             if next_poll < time.monotonic() - POLL_SECONDS:
@@ -306,13 +443,38 @@ def run_live(stocks: list[Stock]) -> int:
         df.to_parquet(norm_path, index=False)
         df.to_csv(csv_path, index=False, encoding="utf-8-sig")
 
-    gaps = []
-    if len(timestamps) >= 2:
-        gaps = [(b - a).total_seconds() for a, b in zip(timestamps, timestamps[1:])]
-    expected_cycles = int(((datetime.combine(now_tw().date(), END_TIME, TZ) - datetime.combine(now_tw().date(), START_TIME, TZ)).total_seconds()) / POLL_SECONDS)
-    actual_cycles = len(timestamps)
-    missing_cycles = max(0, expected_cycles - actual_cycles)
-    missing_rate = (missing_cycles / expected_cycles) if expected_cycles else 0.0
+    expected_preopen = expected_cycles(START_TIME, PREOPEN_END, actual_process_start)
+    expected_open = expected_cycles(PREOPEN_END, END_TIME, actual_process_start)
+    preopen_coverage = (
+        len(preopen_valid_cycles) / expected_preopen if expected_preopen else 0.0
+    )
+    open_coverage = len(open_valid_cycles) / expected_open if expected_open else 0.0
+    observed_max_gap = max_gap_seconds(all_valid_cycles)
+
+    first_preopen = preopen_valid_cycles[0] if preopen_valid_cycles else None
+    last_preopen = preopen_valid_cycles[-1] if preopen_valid_cycles else None
+    first_preopen_ok = bool(first_preopen and first_preopen <= first_preopen_deadline_at)
+    last_preopen_ok = bool(last_preopen and last_preopen >= last_preopen_earliest_at)
+    preopen_coverage_ok = preopen_coverage >= MIN_PREOPEN_COVERAGE
+    open_coverage_ok = open_coverage >= MIN_OPEN_COVERAGE
+    gap_ok = observed_max_gap is not None and observed_max_gap <= MAX_ALLOWED_GAP_SECONDS
+    errors_ok = error_count == 0
+    freshness_ok = stale_row_count == 0
+    symbol_coverage_ok = min_observed_symbol_coverage >= MIN_SYMBOL_COVERAGE
+
+    gates = {
+        "startup_before_082945": startup_ok,
+        "first_preopen_by_083020": first_preopen_ok,
+        "last_preopen_at_or_after_085940": last_preopen_ok,
+        "preopen_coverage_ok": preopen_coverage_ok,
+        "open_validation_coverage_ok": open_coverage_ok,
+        "max_gap_ok": gap_ok,
+        "request_errors_zero": errors_ok,
+        "fresh_market_date_only": freshness_ok,
+        "symbol_coverage_ok": symbol_coverage_ok,
+    }
+    failure_reasons = [name.upper() for name, passed in gates.items() if not passed]
+    pass_candidate = all(gates.values())
 
     report = {
         "mode": "live",
@@ -320,6 +482,8 @@ def run_live(stocks: list[Stock]) -> int:
         "actual_process_start": actual_process_start.isoformat(),
         "first_capture": first_capture,
         "last_capture": last_capture,
+        "first_preopen_valid_capture": first_preopen.isoformat() if first_preopen else None,
+        "last_preopen_valid_capture": last_preopen.isoformat() if last_preopen else None,
         "schedule_delay_seconds_from_0825": schedule_delay_seconds,
         "poll_seconds": POLL_SECONDS,
         "requested_symbols": len(stocks),
@@ -329,19 +493,32 @@ def run_live(stocks: list[Stock]) -> int:
         "open_validation_rows": open_rows,
         "error_count": error_count,
         "empty_response_count": empty_count,
-        "expected_cycles_0830_0930": expected_cycles,
-        "actual_cycles_with_rows": actual_cycles,
-        "missing_cycles": missing_cycles,
-        "missing_rate": missing_rate,
-        "max_gap_seconds": max(gaps) if gaps else None,
-        "pass_candidate": preopen_rows > 0 and open_rows > 0 and error_count == 0,
+        "stale_row_count": stale_row_count,
+        "incomplete_cycle_count": incomplete_cycle_count,
+        "expected_preopen_cycles": expected_preopen,
+        "actual_preopen_valid_cycles": len(preopen_valid_cycles),
+        "preopen_coverage": preopen_coverage,
+        "required_preopen_coverage": MIN_PREOPEN_COVERAGE,
+        "expected_open_validation_cycles": expected_open,
+        "actual_open_validation_valid_cycles": len(open_valid_cycles),
+        "open_validation_coverage": open_coverage,
+        "required_open_validation_coverage": MIN_OPEN_COVERAGE,
+        "min_observed_symbol_coverage": min_observed_symbol_coverage,
+        "required_symbol_coverage": MIN_SYMBOL_COVERAGE,
+        "max_gap_seconds": observed_max_gap,
+        "allowed_max_gap_seconds": MAX_ALLOWED_GAP_SECONDS,
+        "gates": gates,
+        "failure_reasons": failure_reasons,
+        "pass_candidate": pass_candidate,
+        "pass": pass_candidate,
         "raw_file": str(raw_path),
         "normalized_parquet": str(norm_path),
         "normalized_csv": str(csv_path),
+        "heartbeat_file": str(heartbeat_path),
     }
     atomic_write_json(report_path, report)
     print(json.dumps(report, ensure_ascii=False))
-    return 0 if report["pass_candidate"] else 4
+    return 0 if pass_candidate else 4
 
 
 def main() -> int:
