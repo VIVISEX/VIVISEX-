@@ -75,6 +75,7 @@ def main() -> int:
         require(prod.MIS_URL == "https://mis.twse.com.tw/stock/api/getStockInfo.jsp", "unexpected MIS endpoint")
         require(prod.SOURCE_GAP_CONSECUTIVE_CYCLES >= 2, "SOURCE_GAP threshold too aggressive")
         require(prod.MAX_RETRIES >= 3, "retry budget too small")
+        require(prod.ENABLE_SINGLE_FALLBACK is True, "single-symbol fallback disabled")
         stocks = prod.load_stocks(ROOT / "stocks.csv")
         require(len(stocks) == 5, f"expected 5 production symbols, got {len(stocks)}")
         require(len({s.code for s in stocks}) == len(stocks), "duplicate stock code")
@@ -82,6 +83,7 @@ def main() -> int:
             "symbols": [s.code for s in stocks],
             "endpoint": prod.MIS_URL,
             "max_retries": prod.MAX_RETRIES,
+            "single_fallback_retries": prod.SINGLE_FALLBACK_RETRIES,
             "source_gap_cycles": prod.SOURCE_GAP_CONSECUTIVE_CYCLES,
             "max_request_error_rate": prod.MAX_REQUEST_ERROR_RATE,
         }
@@ -119,6 +121,56 @@ def main() -> int:
             "five_level_complete": True,
         }
 
+    def forced_single_fallback() -> dict[str, Any]:
+        fixture = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
+        fixture_items = {
+            str(item.get("c", "")): item for item in (fixture.get("msgArray") or [])
+        }
+        stocks = prod.load_stocks(ROOT / "stocks.csv")
+        original_core = prod._fetch_core
+
+        def fake_core(session, batch, max_retries, request_timeout):
+            if len(batch) > 1:
+                raise RuntimeError("synthetic_batch_HTTP_502")
+            stock = batch[0]
+            item = fixture_items.get(stock.code)
+            if item is None:
+                raise RuntimeError(f"fixture_missing_{stock.code}")
+            return {
+                "rtcode": "0000",
+                "rtmessage": "OK",
+                "msgArray": [item],
+                "queryTime": {"sysDate": "20260807", "sysTime": "14:30:00"},
+            }
+
+        try:
+            prod._fetch_core = fake_core
+            session = prod.make_session(warmup=False)
+            raw = prod.fetch_batch(session, stocks)
+        finally:
+            prod._fetch_core = original_core
+            try:
+                session.close()
+            except Exception:
+                pass
+
+        mode = (raw.get("_qts_transport") or {}).get("mode")
+        require(mode == "single_symbol_parallel_fallback", f"fallback mode not used: {mode}")
+        items = raw.get("msgArray") or []
+        returned = {str(item.get("c", "")) for item in items}
+        expected = {stock.code for stock in stocks}
+        require(returned == expected, f"fallback symbol mismatch: {sorted(returned)}")
+        rows = [prod.normalize_item(item, datetime.now(TZ), "FORCED_FALLBACK") for item in items]
+        incomplete = [str(row.get("code")) for row in rows if not five_level_complete(row)]
+        require(not incomplete, f"fallback five-level incomplete: {incomplete}")
+        return {
+            "synthetic_primary_failure": "HTTP_502",
+            "transport_mode": mode,
+            "rows": len(rows),
+            "symbols": sorted(returned),
+            "five_level_complete": True,
+        }
+
     def live_mis_resilience_probe() -> dict[str, Any]:
         stocks = prod.load_stocks(ROOT / "stocks.csv")
         expected = {s.code for s in stocks}
@@ -127,6 +179,7 @@ def main() -> int:
 
         for round_no in range(1, LIVE_PROBE_ROUNDS + 1):
             t0 = time.perf_counter()
+            session = None
             try:
                 session = prod.make_session(warmup=True)
                 raw = prod.fetch_batch(session, stocks)
@@ -146,11 +199,13 @@ def main() -> int:
                 today_compact = captured.strftime("%Y%m%d")
                 require(all(d <= today_compact for d in market_dates), f"future market date returned: {market_dates}")
                 query_time = raw.get("queryTime") or {}
+                transport_mode = (raw.get("_qts_transport") or {}).get("mode", "unknown")
                 attempts.append(
                     {
                         "round": round_no,
                         "pass": True,
                         "latency_ms": latency_ms,
+                        "transport_mode": transport_mode,
                         "rows": len(rows),
                         "market_dates": market_dates,
                         "query_sys_date": query_time.get("sysDate"),
@@ -168,10 +223,11 @@ def main() -> int:
                     }
                 )
             finally:
-                try:
-                    session.close()
-                except Exception:
-                    pass
+                if session is not None:
+                    try:
+                        session.close()
+                    except Exception:
+                        pass
 
             if round_no < LIVE_PROBE_ROUNDS:
                 time.sleep(LIVE_PROBE_PAUSE_SECONDS)
@@ -192,17 +248,18 @@ def main() -> int:
     run("production_contract", production_contract)
     run("phase_state_machine", state_machine)
     run("historical_replay_2026_08_07", historical_replay)
+    run("forced_batch_502_single_symbol_fallback", forced_single_fallback)
     run("live_twse_mis_resilience_probe", live_mis_resilience_probe)
 
     passed = all(item.get("pass") is True for item in results)
     report = {
         "component": "A4_001T",
-        "purpose": "Production readiness: production parser replay + resilient real GitHub Runner to TWSE MIS probe",
+        "purpose": "Production readiness: parser replay + forced fallback + resilient real GitHub Runner to TWSE MIS probe",
         "started_at": started.isoformat(),
         "finished_at": datetime.now(TZ).isoformat(),
         "pass": passed,
         "tests": results,
-        "scope_note": "This validates runner, dependencies, endpoint reachability, retry/session recovery, five-level parsing and historical replay. It does not replace the real 08:30-09:00 pre-open production acceptance test.",
+        "scope_note": "This validates runner, dependencies, endpoint reachability, retry/session recovery, forced batch-502 fallback, five-level parsing and historical replay. It does not replace the real 08:30-09:00 pre-open production acceptance test.",
     }
     report_path = OUTPUT_DIR / "readiness_report.json"
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
