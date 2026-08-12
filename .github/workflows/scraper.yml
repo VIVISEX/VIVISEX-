@@ -41,8 +41,13 @@ jobs:
       PREOPEN_END: "09:00:00"
       END_TIME: "09:30:00"
       BATCH_SIZE: "50"
-      MAX_RETRIES: "5"
-      REQUEST_TIMEOUT: "8"
+      MAX_RETRIES: "4"
+      REQUEST_TIMEOUT: "5"
+      RETRY_BASE_SECONDS: "0.35"
+      RETRY_CAP_SECONDS: "2.0"
+      WARMUP_TIMEOUT: "4"
+      SOURCE_GAP_CONSECUTIVE_CYCLES: "3"
+      MAX_REQUEST_ERROR_RATE: "0.02"
       RUN_MODE: ${{ (github.event_name == 'schedule' || github.event_name == 'push') && 'live' || inputs.run_mode }}
       DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
 
