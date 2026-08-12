@@ -1,9 +1,9 @@
 {
   "component": "A4_001A",
-  "status": "ARMED",
-  "date": null,
+  "status": "TEST_TRIGGER",
+  "date": "2026-08-13",
   "attempt": 0,
-  "requested_at": null,
-  "reason": "initial_watchdog_arm",
+  "requested_at": "2026-08-13T01:18:00+08:00",
+  "reason": "outside_window_safety_test",
   "requested_by": "ChatGPT_A4_Watchdog"
 }
