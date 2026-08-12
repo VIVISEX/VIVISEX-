@@ -1,0 +1,9 @@
+{
+  "component": "A4_001A",
+  "status": "ARMED",
+  "date": null,
+  "attempt": 0,
+  "requested_at": null,
+  "reason": "initial_watchdog_arm",
+  "requested_by": "ChatGPT_A4_Watchdog"
+}
