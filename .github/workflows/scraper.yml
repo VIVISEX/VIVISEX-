@@ -55,6 +55,7 @@ jobs:
       MIN_OPEN_COVERAGE: "0.95"
       MIN_SYMBOL_COVERAGE: "1.0"
       MAX_ALLOWED_GAP_SECONDS: "15"
+      A4_MARKET_GATE_TIMEOUT: "5"
       RUN_MODE: ${{ (github.event_name == 'schedule' || github.event_name == 'push') && 'live' || inputs.run_mode }}
       DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
 
@@ -118,8 +119,26 @@ jobs:
           python -m pip install --upgrade pip
           pip install pandas requests pyarrow
 
-      - name: Run A4 MIS scraper
+      - name: TWSE official trading-day gate
         if: steps.guard.outputs.should_run == 'true'
+        id: market_gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$RUN_MODE" != "live" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "market_status=NON_LIVE" >> "$GITHUB_OUTPUT"
+            echo "calendar_verified=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          python A4_001G_TradingDayGate.py
+          echo "should_run=$(jq -r '.should_run' output/mis/market_gate.json)" >> "$GITHUB_OUTPUT"
+          echo "market_status=$(jq -r '.market_status' output/mis/market_gate.json)" >> "$GITHUB_OUTPUT"
+          echo "calendar_verified=$(jq -r '.calendar_verified' output/mis/market_gate.json)" >> "$GITHUB_OUTPUT"
+          cat output/mis/market_gate.json
+
+      - name: Run A4 MIS scraper
+        if: steps.guard.outputs.should_run == 'true' && steps.market_gate.outputs.should_run == 'true'
         id: scraper
         continue-on-error: true
         run: |
@@ -138,6 +157,9 @@ jobs:
         if: ${{ always() && steps.guard.outputs.should_run == 'true' }}
         env:
           SCRAPER_OUTCOME: ${{ steps.scraper.outcome }}
+          MARKET_STATUS: ${{ steps.market_gate.outputs.market_status }}
+          MARKET_SHOULD_RUN: ${{ steps.market_gate.outputs.should_run }}
+          CALENDAR_VERIFIED: ${{ steps.market_gate.outputs.calendar_verified }}
           EVENT_NAME: ${{ github.event_name }}
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
@@ -152,7 +174,9 @@ jobs:
           git pull --rebase origin "$DEFAULT_BRANCH"
           mkdir -p status/a4
 
-          if [ -f "output/mis/report_${DATE_TW}.json" ]; then
+          if [ "$MARKET_STATUS" = "MARKET_CLOSED" ] && [ -f "output/mis/market_gate.json" ]; then
+            REPORT="output/mis/market_gate.json"
+          elif [ -f "output/mis/report_${DATE_TW}.json" ]; then
             REPORT="output/mis/report_${DATE_TW}.json"
           elif [ -f "output/mis/env_test_report.json" ]; then
             REPORT="output/mis/env_test_report.json"
@@ -163,6 +187,9 @@ jobs:
           if [ -n "$REPORT" ]; then
             jq --arg checked_at "$NOW_TW" \
                --arg workflow_outcome "$SCRAPER_OUTCOME" \
+               --arg market_status "$MARKET_STATUS" \
+               --arg market_should_run "$MARKET_SHOULD_RUN" \
+               --arg calendar_verified "$CALENDAR_VERIFIED" \
                --arg event_name "$EVENT_NAME" \
                --arg run_id "$RUN_ID" \
                --arg run_attempt "$RUN_ATTEMPT" \
@@ -170,15 +197,20 @@ jobs:
                '. + {
                  checked_at: $checked_at,
                  workflow_outcome: $workflow_outcome,
+                 market_status: $market_status,
+                 market_should_run: ($market_should_run == "true"),
+                 calendar_verified: ($calendar_verified == "true"),
                  event_name: $event_name,
                  run_id: $run_id,
                  run_attempt: $run_attempt,
                  source_commit: $sha,
-                 pass: (((.pass // .pass_candidate // false) == true) and ($workflow_outcome == "success"))
+                 production_acceptance_applicable: ($market_status != "MARKET_CLOSED"),
+                 pass: (if $market_status == "MARKET_CLOSED" then true else (((.pass // .pass_candidate // false) == true) and ($workflow_outcome == "success")) end)
                }' "$REPORT" > status/a4/latest.json
           else
             jq -n --arg checked_at "$NOW_TW" \
                   --arg workflow_outcome "$SCRAPER_OUTCOME" \
+                  --arg market_status "$MARKET_STATUS" \
                   --arg event_name "$EVENT_NAME" \
                   --arg run_id "$RUN_ID" \
                   --arg run_attempt "$RUN_ATTEMPT" \
@@ -186,6 +218,7 @@ jobs:
                   '{
                     checked_at: $checked_at,
                     workflow_outcome: $workflow_outcome,
+                    market_status: $market_status,
                     event_name: $event_name,
                     run_id: $run_id,
                     run_attempt: $run_attempt,
@@ -226,6 +259,16 @@ jobs:
           if [ "${{ steps.guard.outputs.should_run }}" != "true" ]; then
             echo "A4 duplicate/recovery run skipped: ${{ steps.guard.outputs.reason }}"
             exit 0
+          fi
+
+          if [ "${{ steps.market_gate.outputs.market_status }}" = "MARKET_CLOSED" ]; then
+            echo "A4 market closed; capture correctly skipped"
+            exit 0
+          fi
+
+          if [ "${{ steps.market_gate.outputs.should_run }}" != "true" ]; then
+            echo "A4 trading-day gate did not authorize capture"
+            exit 1
           fi
 
           if [ "${{ steps.scraper.outcome }}" != "success" ]; then
