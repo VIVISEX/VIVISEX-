@@ -1,7 +1,7 @@
 {
   "component": "A4_001T",
-  "requested_at": "2026-08-13T02:12:11+08:00",
+  "requested_at": "2026-08-13T02:14:22+08:00",
   "requested_by": "ChatGPT_A4_Production_Hardening",
-  "reason": "test_single_symbol_parallel_fallback",
-  "attempt": 5
+  "reason": "validate_forced_batch_502_fallback_path",
+  "attempt": 6
 }
