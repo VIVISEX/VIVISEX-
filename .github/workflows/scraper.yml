@@ -1,5 +1,5 @@
 name: QTS A4 TWSE MIS preopen scraper
-run-name: A4 MIS ${{ github.event_name == 'schedule' && 'LIVE' || format('MANUAL-{0}', inputs.run_mode) }} | ${{ github.run_id }}
+run-name: A4 MIS ${{ (github.event_name == 'schedule' || github.event_name == 'push') && 'LIVE' || format('MANUAL-{0}', inputs.run_mode) }} | ${{ github.run_id }}
 
 on:
   workflow_dispatch:
@@ -14,13 +14,18 @@ on:
           - live
   schedule:
     - cron: "25 0 * * 1-5"
+  push:
+    branches:
+      - main
+    paths:
+      - status/a4/recovery_trigger.json
 
 permissions:
   contents: write
 
 concurrency:
-  group: ${{ (github.event_name == 'schedule' || inputs.run_mode == 'live') && 'qts-a4-mis-production' || format('qts-a4-mis-test-{0}', github.run_id) }}
-  cancel-in-progress: ${{ github.event_name == 'workflow_dispatch' && inputs.run_mode == 'live' }}
+  group: ${{ (github.event_name == 'schedule' || github.event_name == 'push' || inputs.run_mode == 'live') && 'qts-a4-mis-production' || format('qts-a4-mis-test-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.run_mode == 'live') }}
 
 jobs:
   scrape:
@@ -38,7 +43,7 @@ jobs:
       BATCH_SIZE: "50"
       MAX_RETRIES: "5"
       REQUEST_TIMEOUT: "8"
-      RUN_MODE: ${{ github.event_name == 'schedule' && 'live' || inputs.run_mode }}
+      RUN_MODE: ${{ (github.event_name == 'schedule' || github.event_name == 'push') && 'live' || inputs.run_mode }}
       DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
 
     steps:
