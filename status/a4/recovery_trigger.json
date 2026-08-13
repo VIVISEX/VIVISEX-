@@ -1,9 +1,9 @@
 {
   "component": "A4_001A",
-  "status": "TEST_TRIGGER",
+  "status": "RECOVERY_REQUESTED",
   "date": "2026-08-13",
-  "attempt": 0,
-  "requested_at": "2026-08-13T01:18:00+08:00",
-  "reason": "outside_window_safety_test",
+  "attempt": 1,
+  "requested_at": "2026-08-13T08:28:00+08:00",
+  "reason": "no_runner_started_0827",
   "requested_by": "ChatGPT_A4_Watchdog"
 }
