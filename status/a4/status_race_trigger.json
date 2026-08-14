@@ -1,0 +1,7 @@
+{
+  "component": "A4_001J",
+  "requested_at": "2026-08-14T17:53:00+08:00",
+  "requested_by": "ChatGPT_A4_ProductionAudit",
+  "reason": "force_non_fast_forward_and_verify_retry_recovery",
+  "attempt": 1
+}
