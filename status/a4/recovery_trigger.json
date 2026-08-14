@@ -1,9 +1,9 @@
 {
   "component": "A4_001A",
-  "status": "RECOVERY_REQUESTED",
-  "date": "2026-08-13",
-  "attempt": 1,
-  "requested_at": "2026-08-13T08:28:00+08:00",
-  "reason": "no_runner_started_0827",
-  "requested_by": "ChatGPT_A4_Watchdog"
+  "status": "WORKFLOW_GUARD_SELFTEST",
+  "date": "2026-08-14",
+  "attempt": 0,
+  "requested_at": "2026-08-14T16:17:00+08:00",
+  "reason": "post_emergency_gate_workflow_guard_selftest_outside_window",
+  "requested_by": "ChatGPT_A4_PrimaryClock"
 }
