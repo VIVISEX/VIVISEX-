@@ -1,7 +1,7 @@
 {
   "component": "A4_001T",
-  "requested_at": "2026-08-14T17:47:00+08:00",
+  "requested_at": "2026-08-14T18:03:00+08:00",
   "requested_by": "ChatGPT_A4_ProductionAudit",
-  "reason": "post_fix_live_twse_revalidation",
-  "attempt": 10
+  "reason": "post_prewarm_live_twse_revalidation",
+  "attempt": 11
 }
