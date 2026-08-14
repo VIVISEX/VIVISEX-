@@ -555,7 +555,12 @@ def run_live(stocks: list[Stock]) -> int:
                 if requested_codes
                 else 0.0
             )
-            min_observed_symbol_coverage = min(min_observed_symbol_coverage, observed_coverage)
+            # Transport failures are judged by request-error, coverage, gap and SOURCE_GAP gates.
+            # Strict symbol coverage is evaluated only when the transport itself returned normally;
+            # this preserves rejection of partial-symbol responses without making one isolated
+            # network miss permanently poison an otherwise acceptable session.
+            if cycle_error_count == 0:
+                min_observed_symbol_coverage = min(min_observed_symbol_coverage, observed_coverage)
             cycle_valid = len(fresh_codes_this_cycle & requested_codes) >= minimum_symbols_per_cycle
 
             if cycle_valid:
