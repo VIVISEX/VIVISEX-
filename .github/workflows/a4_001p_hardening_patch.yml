@@ -1,5 +1,5 @@
 name: QTS A4_001P Hardening Patch
-run-name: A4_001P HARDEN | ${{ github.run_id }}
+run-name: A4_001P PREWARM | ${{ github.run_id }}
 
 on:
   push:
@@ -26,66 +26,38 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Apply deterministic hardening patches
+      - name: Move MIS session warmup before preopen wait
         run: |
           python - <<'PY'
           from pathlib import Path
-          import re
-
           prod = Path('A4_001_TWSE_MIS盤前試撮抓取.py')
           text = prod.read_text(encoding='utf-8')
-          old = '''            min_observed_symbol_coverage = min(min_observed_symbol_coverage, observed_coverage)\n            cycle_valid = len(fresh_codes_this_cycle & requested_codes) >= minimum_symbols_per_cycle\n'''
-          new = '''            # Transport failures are governed by request_error_rate / SOURCE_GAP gates.\n            # Only successful transport cycles participate in strict per-cycle symbol coverage.\n            if cycle_error_count == 0:\n                min_observed_symbol_coverage = min(min_observed_symbol_coverage, observed_coverage)\n            cycle_valid = len(fresh_codes_this_cycle & requested_codes) >= minimum_symbols_per_cycle\n'''
+          old = '''    while phase_for(now_tw().time()) == "WAIT":\n        remaining = (start_at - now_tw()).total_seconds()\n        time.sleep(max(0.2, min(5.0, remaining)))\n\n    session = make_session(warmup=True)\n'''
+          new = '''    # Warm the TWSE MIS session before 08:30 so the first market request does not\n    # pay connection/cookie warmup latency after the pre-open window begins.\n    session = make_session(warmup=True)\n\n    while phase_for(now_tw().time()) == "WAIT":\n        remaining = (start_at - now_tw()).total_seconds()\n        time.sleep(max(0.2, min(5.0, remaining)))\n'''
           if old not in text:
-              raise SystemExit('production symbol coverage patch target not found')
+              raise SystemExit('prewarm patch target not found')
           prod.write_text(text.replace(old, new, 1), encoding='utf-8')
-
-          workflows = [
-              Path('.github/workflows/scraper.yml'),
-              Path('.github/workflows/a4_001t_readiness.yml'),
-              Path('.github/workflows/a4_001c_clock_readiness.yml'),
-              Path('.github/workflows/a4_001h_emergency_gate.yml'),
-              Path('.github/workflows/a4_001i_full_day_simulation.yml'),
-          ]
-          replacement = '''{indent}for push_attempt in 1 2 3 4 5; do\n{indent}  if git push origin "$DEFAULT_BRANCH"; then\n{indent}    break\n{indent}  fi\n{indent}  if [ "$push_attempt" -eq 5 ]; then\n{indent}    echo "Git push failed after 5 attempts"\n{indent}    exit 1\n{indent}  fi\n{indent}  git fetch origin "$DEFAULT_BRANCH"\n{indent}  git rebase "origin/$DEFAULT_BRANCH"\n{indent}  sleep $((push_attempt * 2))\n{indent}done'''
-
-          for path in workflows:
-              body = path.read_text(encoding='utf-8')
-              pattern = re.compile(r'^(?P<indent>\s*)git push origin "\$DEFAULT_BRANCH"\s*$', re.M)
-              matches = list(pattern.finditer(body))
-              if not matches:
-                  raise SystemExit(f'no git push target in {path}')
-              def repl(match):
-                  return replacement.format(indent=match.group('indent'))
-              body = pattern.sub(repl, body)
-              path.write_text(body, encoding='utf-8')
-
-          workflow = Path('.github/workflows/scraper.yml')
-          body = workflow.read_text(encoding='utf-8')
-          marker = '          DATE_TW=$(TZ=Asia/Taipei date +%F)\n          NOW_TW=$(TZ=Asia/Taipei date --iso-8601=seconds)\n          REPORT=""\n\n          git pull --rebase origin "$DEFAULT_BRANCH"\n'
-          replacement_marker = '          DATE_TW=$(TZ=Asia/Taipei date +%F)\n          NOW_TW=$(TZ=Asia/Taipei date --iso-8601=seconds)\n          REPORT=""\n          EXECUTED_SHA=$(git rev-parse HEAD)\n\n          git pull --rebase origin "$DEFAULT_BRANCH"\n'
-          if marker not in body:
-              raise SystemExit('executed SHA marker target not found')
-          body = body.replace(marker, replacement_marker, 1)
-          body = body.replace('--arg sha "$SHA"', '--arg sha "$EXECUTED_SHA"')
-          workflow.write_text(body, encoding='utf-8')
           PY
 
-      - name: Validate patched syntax and contracts
+      - name: Validate production syntax and placement
         run: |
           python -m py_compile "A4_001_TWSE_MIS盤前試撮抓取.py"
-          python A4_001C_ClockGuardSelfTest.py
-          grep -q 'if cycle_error_count == 0:' "A4_001_TWSE_MIS盤前試撮抓取.py"
-          grep -q 'EXECUTED_SHA=$(git rev-parse HEAD)' .github/workflows/scraper.yml
-          test "$(grep -R 'Git push failed after 5 attempts' .github/workflows/scraper.yml .github/workflows/a4_001t_readiness.yml .github/workflows/a4_001c_clock_readiness.yml .github/workflows/a4_001h_emergency_gate.yml .github/workflows/a4_001i_full_day_simulation.yml | wc -l)" -eq 5
+          python - <<'PY'
+          from pathlib import Path
+          text = Path('A4_001_TWSE_MIS盤前試撮抓取.py').read_text(encoding='utf-8')
+          session_pos = text.index('session = make_session(warmup=True)', text.index('def run_live'))
+          wait_pos = text.index('while phase_for(now_tw().time()) == "WAIT"', text.index('def run_live'))
+          assert session_pos < wait_pos, (session_pos, wait_pos)
+          print('PREWARM_ORDER_PASS')
+          PY
 
-      - name: Commit hardened production files
+      - name: Commit production prewarm
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "A4_001_TWSE_MIS盤前試撮抓取.py" .github/workflows/scraper.yml .github/workflows/a4_001t_readiness.yml .github/workflows/a4_001c_clock_readiness.yml .github/workflows/a4_001h_emergency_gate.yml .github/workflows/a4_001i_full_day_simulation.yml
-          git commit -m "A4_001: tolerate isolated transport gaps and retry status pushes"
+          git add "A4_001_TWSE_MIS盤前試撮抓取.py"
+          git commit -m "A4_001: prewarm MIS session before 08:30"
           for push_attempt in 1 2 3 4 5; do
             if git push origin main; then
               exit 0
