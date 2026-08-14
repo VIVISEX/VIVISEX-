@@ -1,0 +1,9 @@
+{
+  "component": "A4_001I",
+  "pass": false,
+  "error": "AssertionError: two isolated transient errors should remain within production tolerance",
+  "checked_at": "2026-08-14T17:35:16+08:00",
+  "run_id": "31788673970",
+  "source_commit": "4ac23a2aefaf7d8bc0ad95e98f099d5ebc204fbd",
+  "workflow_outcome": "failure"
+}
