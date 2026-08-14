@@ -1,7 +1,7 @@
 {
   "component": "A4_001H",
-  "requested_at": "2026-08-14T16:11:00+08:00",
-  "requested_by": "ChatGPT_A4_Production_Hardening",
-  "reason": "validate_weekend_holiday_and_emergency_market_closure_gate",
-  "attempt": 1
+  "requested_at": "2026-08-14T17:35:00+08:00",
+  "requested_by": "ChatGPT_A4_ProductionAudit",
+  "reason": "rerun_weekend_holiday_emergency_gate_after_final_hardening",
+  "attempt": 2
 }
