@@ -1,0 +1,155 @@
+{
+  "component": "A4_001H",
+  "purpose": "Trading-day + emergency market-closure production gate validation",
+  "started_at": "2026-08-14T16:16:05.642598+08:00",
+  "finished_at": "2026-08-14T16:16:10.121332+08:00",
+  "pass": true,
+  "tests": [
+    {
+      "name": "weekend_gate",
+      "pass": true,
+      "elapsed_ms": 0.02,
+      "detail": {
+        "market_date": "2026-08-15",
+        "market_status": "MARKET_CLOSED",
+        "should_run": false,
+        "calendar_verified": true,
+        "reason": "WEEKEND",
+        "source": "TWSE_OFFICIAL_CALENDAR",
+        "calendar_name": null,
+        "calendar_description": null,
+        "emergency_verified": true,
+        "emergency_source": "NOT_REQUIRED",
+        "emergency_reason": "WEEKEND",
+        "emergency_page_date": null,
+        "emergency_detail": null,
+        "checked_at": "2026-08-14T16:16:05.642615+08:00"
+      }
+    },
+    {
+      "name": "normal_weekday_gate",
+      "pass": true,
+      "elapsed_ms": 0.01,
+      "detail": {
+        "market_date": "2026-08-17",
+        "market_status": "MARKET_OPEN",
+        "should_run": true,
+        "calendar_verified": true,
+        "reason": "NORMAL_TRADING_WEEKDAY",
+        "source": "TWSE_OFFICIAL_CALENDAR",
+        "calendar_name": null,
+        "calendar_description": null,
+        "emergency_verified": false,
+        "emergency_source": null,
+        "emergency_reason": null,
+        "emergency_page_date": null,
+        "emergency_detail": null,
+        "checked_at": "2026-08-14T16:16:05.642636+08:00"
+      }
+    },
+    {
+      "name": "synthetic_full_day_emergency_closure",
+      "pass": true,
+      "elapsed_ms": 0.51,
+      "detail": {
+        "verified": true,
+        "market_closed": true,
+        "reason": "TAIPEI_FULL_OR_MORNING_WORK_SUSPENSION",
+        "source": "DGPA_OFFICIAL_DAILY_CLOSURE",
+        "page_date": "2026-08-17",
+        "detail": "115年 8月 17日 天然災害停止上班及上課情形 臺北市 今天停止上班、停止上課。"
+      }
+    },
+    {
+      "name": "synthetic_morning_emergency_closure",
+      "pass": true,
+      "elapsed_ms": 0.05,
+      "detail": {
+        "verified": true,
+        "market_closed": true,
+        "reason": "TAIPEI_FULL_OR_MORNING_WORK_SUSPENSION",
+        "source": "DGPA_OFFICIAL_DAILY_CLOSURE",
+        "page_date": "2026-08-17",
+        "detail": "115年 8月 17日 天然災害停止上班及上課情形 臺北市 上午停止上班、停止上課。"
+      }
+    },
+    {
+      "name": "synthetic_afternoon_only_market_stays_open",
+      "pass": true,
+      "elapsed_ms": 0.15,
+      "detail": {
+        "verified": true,
+        "market_closed": false,
+        "reason": "TAIPEI_AFTERNOON_ONLY_CLOSURE_MARKET_OPEN",
+        "source": "DGPA_OFFICIAL_DAILY_CLOSURE",
+        "page_date": "2026-08-17",
+        "detail": "115年 8月 17日 天然災害停止上班及上課情形 臺北市 下午停止上班、停止上課。"
+      }
+    },
+    {
+      "name": "synthetic_partial_district_market_stays_open",
+      "pass": true,
+      "elapsed_ms": 0.06,
+      "detail": {
+        "verified": true,
+        "market_closed": false,
+        "reason": "TAIPEI_NORMAL_WORK",
+        "source": "DGPA_OFFICIAL_DAILY_CLOSURE",
+        "page_date": "2026-08-17",
+        "detail": "115年 8月 17日 天然災害停止上班及上課情形 臺北市 北投區停止上班、停止上課，其他地區照常上班。"
+      }
+    },
+    {
+      "name": "synthetic_stale_notice_ignored",
+      "pass": true,
+      "elapsed_ms": 0.03,
+      "detail": {
+        "verified": true,
+        "market_closed": false,
+        "reason": "NO_CURRENT_DAY_EMERGENCY_NOTICE",
+        "source": "DGPA_OFFICIAL_DAILY_CLOSURE",
+        "page_date": "2026-08-16",
+        "detail": "DGPA latest notice is for another date"
+      }
+    },
+    {
+      "name": "synthetic_no_suspension_notice",
+      "pass": true,
+      "elapsed_ms": 0.02,
+      "detail": {
+        "verified": true,
+        "market_closed": false,
+        "reason": "DGPA_NO_SUSPENSION_NOTICE",
+        "source": "DGPA_OFFICIAL_DAILY_CLOSURE",
+        "page_date": "2026-08-17",
+        "detail": null
+      }
+    },
+    {
+      "name": "live_twse_calendar_plus_dgpa_probe",
+      "pass": true,
+      "elapsed_ms": 4477.86,
+      "detail": {
+        "market_date": "2026-08-14",
+        "market_status": "MARKET_OPEN",
+        "should_run": true,
+        "calendar_verified": true,
+        "reason": "NORMAL_TRADING_WEEKDAY",
+        "source": "TWSE_CALENDAR_PLUS_DGPA",
+        "calendar_name": null,
+        "calendar_description": null,
+        "emergency_verified": true,
+        "emergency_source": "DGPA_OFFICIAL_DAILY_CLOSURE",
+        "emergency_reason": "DGPA_NO_SUSPENSION_NOTICE",
+        "emergency_page_date": "2026-08-14",
+        "emergency_detail": null,
+        "checked_at": "2026-08-14T16:16:10.121312+08:00"
+      }
+    }
+  ],
+  "scope_note": "Synthetic cases validate TWSE disaster-market rules implemented by A4. Live probe validates GitHub Runner connectivity to the TWSE official holiday calendar and DGPA official daily suspension page. This does not replace the next real 08:30-09:00 capture acceptance.",
+  "workflow_outcome": "success",
+  "checked_at": "2026-08-14T16:16:11+08:00",
+  "run_id": "31783207738",
+  "source_commit": "0ae300d1336763d7ca112de520215b4e2a93e062"
+}
