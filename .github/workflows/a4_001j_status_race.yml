@@ -1,0 +1,104 @@
+name: QTS A4_001J Status Race Test
+run-name: A4_001J STATUS-RACE | ${{ github.run_id }}
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - status/a4/status_race_trigger.json
+
+permissions:
+  contents: write
+
+concurrency:
+  group: qts-a4-001j-status-race
+  cancel-in-progress: false
+
+jobs:
+  race-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Force non-fast-forward and prove retry recovery
+        env:
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          mkdir -p status/a4
+
+          echo "local-${RUN_ID}" > status/a4/_race_local.txt
+          git add status/a4/_race_local.txt
+          git commit -m "A4_001J local stale commit ${RUN_ID}"
+
+          git worktree add /tmp/a4-racer origin/main
+          (
+            cd /tmp/a4-racer
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            mkdir -p status/a4
+            echo "remote-${RUN_ID}" > status/a4/_race_remote.txt
+            git add status/a4/_race_remote.txt
+            git commit -m "A4_001J competing remote commit ${RUN_ID}"
+            git push origin HEAD:main
+          )
+
+          FIRST_PUSH_FAILED=false
+          if git push origin main; then
+            echo "Expected first stale push to fail, but it succeeded"
+            exit 1
+          else
+            FIRST_PUSH_FAILED=true
+          fi
+
+          RECOVERED=false
+          for push_attempt in 1 2 3 4 5; do
+            git fetch origin main
+            git rebase origin/main
+            if git push origin main; then
+              RECOVERED=true
+              break
+            fi
+            sleep $((push_attempt * 2))
+          done
+
+          if [ "$FIRST_PUSH_FAILED" != "true" ] || [ "$RECOVERED" != "true" ]; then
+            echo "Race retry contract failed"
+            exit 1
+          fi
+
+          git fetch origin main
+          git reset --hard origin/main
+          test -f status/a4/_race_local.txt
+          test -f status/a4/_race_remote.txt
+
+          rm -f status/a4/_race_local.txt status/a4/_race_remote.txt
+          cat > status/a4/status_race_latest.json <<JSON
+          {
+            "component": "A4_001J",
+            "pass": true,
+            "first_stale_push_failed": true,
+            "retry_rebase_push_recovered": true,
+            "run_id": "${RUN_ID}"
+          }
+          JSON
+          git add -A status/a4/_race_local.txt status/a4/_race_remote.txt status/a4/status_race_latest.json
+          git commit -m "A4_001J status race PASS ${RUN_ID}"
+
+          for push_attempt in 1 2 3 4 5; do
+            if git push origin main; then
+              exit 0
+            fi
+            git fetch origin main
+            git rebase origin/main
+            sleep $((push_attempt * 2))
+          done
+          exit 1
