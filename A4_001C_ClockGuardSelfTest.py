@@ -32,6 +32,12 @@ def authorized(now: time, trigger: Trigger, completed: bool = False) -> tuple[bo
     return True, 'authorized_live_start'
 
 
+def final_gate_wait_seconds(now: time) -> int:
+    now_sec = now.hour * 3600 + now.minute * 60 + now.second
+    target = 8 * 3600 + 28 * 60 + 30
+    return max(0, target - now_sec)
+
+
 def main() -> int:
     cases = [
         ('before_window', time(8, 9), Trigger(TODAY, 0, 'ChatGPT_A4_PrimaryClock'), False, False),
@@ -56,6 +62,23 @@ def main() -> int:
             'pass': decision == expected,
         })
 
+    wait_cases = [
+        ('primary_runner_0815', time(8, 15, 0), 810),
+        ('recovery_0827', time(8, 27, 0), 90),
+        ('one_second_before_gate', time(8, 28, 29), 1),
+        ('exact_gate_time', time(8, 28, 30), 0),
+        ('late_recovery_0829', time(8, 29, 0), 0),
+    ]
+    wait_results = []
+    for name, now, expected in wait_cases:
+        actual = final_gate_wait_seconds(now)
+        wait_results.append({
+            'name': name,
+            'expected_wait_seconds': expected,
+            'actual_wait_seconds': actual,
+            'pass': actual == expected,
+        })
+
     text = WORKFLOW.read_text(encoding='utf-8')
     workflow_checks = {
         'push_start_0810': 'PUSH_START=$((8 * 60 + 10))' in text,
@@ -66,13 +89,23 @@ def main() -> int:
         'completed_guard': 'reason=already_completed' in text,
         'push_cancels_running': "cancel-in-progress: ${{ github.event_name == 'push'" in text,
         'schedule_backup_present': 'cron: "25 0 * * 1-5"' in text,
+        'final_market_gate_target_082830': 'TARGET_SEC=$((8 * 3600 + 28 * 60 + 30))' in text,
+        'final_market_gate_live_only': "steps.guard.outputs.should_run == 'true' && env.RUN_MODE == 'live'" in text,
+        'final_market_gate_before_scraper': text.find('Wait until final market-gate window') < text.find('TWSE trading-day and emergency-closure gate') < text.find('Run A4 MIS scraper'),
+        'status_push_retry_present': 'A4 status push failed after 5 attempts' in text,
+        'executed_sha_recorded': 'EXECUTED_SHA=$(git rev-parse HEAD)' in text,
     }
 
-    passed = all(item['pass'] for item in results) and all(workflow_checks.values())
+    passed = (
+        all(item['pass'] for item in results)
+        and all(item['pass'] for item in wait_results)
+        and all(workflow_checks.values())
+    )
     report = {
         'component': 'A4_001C',
-        'purpose': 'Deterministic primary-clock and recovery guard validation',
+        'purpose': 'Deterministic primary-clock, recovery guard, and final market-gate timing validation',
         'cases': results,
+        'final_gate_wait_cases': wait_results,
         'workflow_checks': workflow_checks,
         'pass': passed,
     }
