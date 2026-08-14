@@ -1,6 +1,6 @@
 {
   "component": "A4_001C",
-  "purpose": "Deterministic primary-clock and recovery guard validation",
+  "purpose": "Deterministic primary-clock, recovery guard, and final market-gate timing validation",
   "cases": [
     {
       "name": "before_window",
@@ -66,6 +66,38 @@
       "pass": true
     }
   ],
+  "final_gate_wait_cases": [
+    {
+      "name": "primary_runner_0815",
+      "expected_wait_seconds": 810,
+      "actual_wait_seconds": 810,
+      "pass": true
+    },
+    {
+      "name": "recovery_0827",
+      "expected_wait_seconds": 90,
+      "actual_wait_seconds": 90,
+      "pass": true
+    },
+    {
+      "name": "one_second_before_gate",
+      "expected_wait_seconds": 1,
+      "actual_wait_seconds": 1,
+      "pass": true
+    },
+    {
+      "name": "exact_gate_time",
+      "expected_wait_seconds": 0,
+      "actual_wait_seconds": 0,
+      "pass": true
+    },
+    {
+      "name": "late_recovery_0829",
+      "expected_wait_seconds": 0,
+      "actual_wait_seconds": 0,
+      "pass": true
+    }
+  ],
   "workflow_checks": {
     "push_start_0810": true,
     "push_end_0835": true,
@@ -74,11 +106,16 @@
     "stale_date_guard": true,
     "completed_guard": true,
     "push_cancels_running": true,
-    "schedule_backup_present": true
+    "schedule_backup_present": true,
+    "final_market_gate_target_082830": true,
+    "final_market_gate_live_only": true,
+    "final_market_gate_before_scraper": true,
+    "status_push_retry_present": true,
+    "executed_sha_recorded": true
   },
   "pass": true,
-  "checked_at": "2026-08-14T17:49:45+08:00",
-  "run_id": "31789691309",
-  "source_commit": "c3ef83bc766771320873b5c36197034ddfd53975",
+  "checked_at": "2026-08-14T17:57:40+08:00",
+  "run_id": "31790245918",
+  "source_commit": "3c17d8115b65196e8658b56f2c6a665f1e1b5323",
   "workflow_outcome": "success"
 }
