@@ -1,7 +1,7 @@
 {
   "component": "A4_001C",
-  "requested_at": "2026-08-14T17:35:00+08:00",
-  "requested_by": "ChatGPT_A4_ProductionAudit",
-  "reason": "rerun_clock_guard_after_primary_clock_and_guard_hardening",
-  "attempt": 2
+  "requested_at": "2026-08-14T17:49:16+08:00",
+  "requested_by": "ChatGPT_A4_Scheduler_WriteTest",
+  "reason": "exact_schedule_write_only_retest",
+  "attempt": 3
 }
