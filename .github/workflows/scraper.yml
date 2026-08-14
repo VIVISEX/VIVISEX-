@@ -150,6 +150,24 @@ jobs:
           python -m pip install --upgrade pip
           pip install pandas requests pyarrow
 
+      - name: Wait until final market-gate window
+        if: steps.guard.outputs.should_run == 'true' && env.RUN_MODE == 'live'
+        shell: bash
+        run: |
+          set -euo pipefail
+          HH=$(TZ=Asia/Taipei date +%H)
+          MM=$(TZ=Asia/Taipei date +%M)
+          SS=$(TZ=Asia/Taipei date +%S)
+          NOW_SEC=$((10#$HH * 3600 + 10#$MM * 60 + 10#$SS))
+          TARGET_SEC=$((8 * 3600 + 28 * 60 + 30))
+          if [ "$NOW_SEC" -lt "$TARGET_SEC" ]; then
+            WAIT_SEC=$((TARGET_SEC - NOW_SEC))
+            echo "Waiting ${WAIT_SEC}s so the official market gate is checked close to pre-open."
+            sleep "$WAIT_SEC"
+          else
+            echo "Already at/after 08:28:30; run final market gate immediately."
+          fi
+
       - name: TWSE trading-day and emergency-closure gate
         if: steps.guard.outputs.should_run == 'true'
         id: market_gate
