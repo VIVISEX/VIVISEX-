@@ -1,0 +1,83 @@
+{
+  "registry": "QTS_A4_ENGINEERING_QUEUE",
+  "updated_at": "2026-08-15T00:15:00+08:00",
+  "governance": {
+    "common_rules": "QTS 共通最高規則",
+    "handoff": "A4 ENGINEERING HANDOFF V1.0",
+    "lifecycle": [
+      "RAW",
+      "CLEAN",
+      "AS-OF-D/LOOK-AHEAD GUARD",
+      "FEATURE",
+      "SIGNAL",
+      "BACKTEST",
+      "OOS/FORWARD",
+      "DECISION",
+      "EXECUTION",
+      "AUDIT"
+    ],
+    "branch_pass_policy": "CANDIDATE_READY_ONLY_UNTIL_CENTRAL_ACCEPTANCE",
+    "missing_data_policy": [
+      "N/A",
+      "WAITING",
+      "SOURCE_GAP",
+      "BLOCKED"
+    ],
+    "lookahead_policy": "D_DAY_USES_ONLY_DATA_AVAILABLE_AT_D",
+    "traceability_required": [
+      "DATA_KEY",
+      "SOURCE",
+      "SOURCE_DATE",
+      "AVAILABLE_AT",
+      "AS_OF_DATE",
+      "VERSION",
+      "RUN_ID",
+      "STRATEGY_ID",
+      "FUND_ID"
+    ]
+  },
+  "critical_path": [
+    {
+      "order": 1,
+      "work_package": "A4_EXISTING_PRODUCTION_HARDENING",
+      "scope": "08:30-09:00 preopen production hardening, watchdog, retry, SOURCE_GAP, 09:00/09:30 validation",
+      "status": "CANDIDATE_READY",
+      "production_acceptance": "REAL_TRADING_DAY_PENDING",
+      "priority": "CRITICAL_PATH",
+      "may_be_interrupted_by_new_work": false
+    },
+    {
+      "order": 2,
+      "work_package": "QTS-WP-A4-PREOPEN-V1",
+      "scope": "Trial Raw -> Indicative Return/Volume -> Bid/Ask Depth -> Order Imbalance -> Price Stability -> Spoofing Risk -> Expected Open -> 09:00 Actual Open -> 09:30 Follow-through -> Forecast Error -> Calibration",
+      "status": "PLANNED",
+      "dependency_status": "DEPENDENCY_PENDING",
+      "depends_on": [
+        "A4_EXISTING_PRODUCTION_HARDENING_REAL_TRADING_DAY_ACCEPTANCE_PASS"
+      ],
+      "start_condition": "DO_NOT_START_UNTIL_DEPENDENCY_PASS",
+      "priority": "AFTER_CRITICAL_PATH",
+      "may_interrupt_current_construction": false,
+      "future_features": [
+        "Indicative Return",
+        "Indicative Volume",
+        "Trial Order Imbalance",
+        "Trial Bid Depth",
+        "Trial Ask Depth",
+        "Trial Price Stability",
+        "Spoofing Risk",
+        "Open vs Trial Error"
+      ],
+      "unified_outputs": [
+        "PREOPEN_DIRECTION",
+        "PREOPEN_CONFIDENCE",
+        "ORDER_IMBALANCE",
+        "SPOOFING_RISK",
+        "EXPECTED_OPEN",
+        "ACTUAL_OPEN",
+        "FORECAST_ERROR"
+      ],
+      "boundary": "A4 does not own long-horizon bull/bear regime; future Central Regime Snapshot is context only"
+    }
+  ]
+}
