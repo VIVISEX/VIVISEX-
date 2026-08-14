@@ -482,8 +482,8 @@
     }
   ],
   "scope_note": "This executes the production run_live function with an accelerated deterministic clock and real production DQ/output logic. Network calls are replaced with five-symbol fixture responses. Real TWSE network reachability is validated separately by A4_001T.",
-  "checked_at": "2026-08-14T17:44:32+08:00",
-  "run_id": "31789304986",
-  "source_commit": "8b1947fc26aba8e46cc0f0fbc2503d8df6de25ff",
+  "checked_at": "2026-08-14T18:02:51+08:00",
+  "run_id": "31790580029",
+  "source_commit": "5203e359c05cb5329aceab0bd4cc381dcfd230e1",
   "workflow_outcome": "success"
 }
