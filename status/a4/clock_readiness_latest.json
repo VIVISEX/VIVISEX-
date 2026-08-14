@@ -1,0 +1,84 @@
+{
+  "component": "A4_001C",
+  "purpose": "Deterministic primary-clock and recovery guard validation",
+  "cases": [
+    {
+      "name": "before_window",
+      "expected": false,
+      "actual": false,
+      "reason": "outside_primary_recovery_window",
+      "pass": true
+    },
+    {
+      "name": "primary_0815",
+      "expected": true,
+      "actual": true,
+      "reason": "authorized_live_start",
+      "pass": true
+    },
+    {
+      "name": "watchdog_0827",
+      "expected": true,
+      "actual": true,
+      "reason": "authorized_live_start",
+      "pass": true
+    },
+    {
+      "name": "watchdog_0829",
+      "expected": true,
+      "actual": true,
+      "reason": "authorized_live_start",
+      "pass": true
+    },
+    {
+      "name": "after_window",
+      "expected": false,
+      "actual": false,
+      "reason": "outside_primary_recovery_window",
+      "pass": true
+    },
+    {
+      "name": "stale_date",
+      "expected": false,
+      "actual": false,
+      "reason": "stale_trigger_date",
+      "pass": true
+    },
+    {
+      "name": "unauthorized_source",
+      "expected": false,
+      "actual": false,
+      "reason": "unauthorized_trigger_source",
+      "pass": true
+    },
+    {
+      "name": "attempt_overflow",
+      "expected": false,
+      "actual": false,
+      "reason": "invalid_trigger_attempt",
+      "pass": true
+    },
+    {
+      "name": "already_completed",
+      "expected": false,
+      "actual": false,
+      "reason": "already_completed",
+      "pass": true
+    }
+  ],
+  "workflow_checks": {
+    "push_start_0810": true,
+    "push_end_0835": true,
+    "primary_clock_allowed": true,
+    "attempt_range_enforced": true,
+    "stale_date_guard": true,
+    "completed_guard": true,
+    "push_cancels_running": true,
+    "schedule_backup_present": true
+  },
+  "pass": true,
+  "checked_at": "2026-08-14T15:58:04+08:00",
+  "run_id": "31781994906",
+  "source_commit": "324e100e839fdde4c8c62c87cab3f16e1d85526c",
+  "workflow_outcome": "success"
+}
