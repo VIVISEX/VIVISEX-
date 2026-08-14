@@ -79,21 +79,6 @@ jobs:
           fi
 
           DATE_TW=$(TZ=Asia/Taipei date +%F)
-
-          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
-            HH=$(TZ=Asia/Taipei date +%H)
-            MM=$(TZ=Asia/Taipei date +%M)
-            NOW_MIN=$((10#$HH * 60 + 10#$MM))
-            RECOVERY_START=$((8 * 60 + 25))
-            RECOVERY_END=$((8 * 60 + 35))
-            if [ "$NOW_MIN" -lt "$RECOVERY_START" ] || [ "$NOW_MIN" -gt "$RECOVERY_END" ]; then
-              echo "should_run=false" >> "$GITHUB_OUTPUT"
-              echo "reason=outside_recovery_window" >> "$GITHUB_OUTPUT"
-              echo "Recovery push ignored outside 08:25-08:35 Asia/Taipei."
-              exit 0
-            fi
-          fi
-
           git fetch origin "$DEFAULT_BRANCH" --quiet
           COMPLETED_PATH="status/a4/${DATE_TW}_COMPLETED.json"
 
@@ -104,8 +89,54 @@ jobs:
             exit 0
           fi
 
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            HH=$(TZ=Asia/Taipei date +%H)
+            MM=$(TZ=Asia/Taipei date +%M)
+            NOW_MIN=$((10#$HH * 60 + 10#$MM))
+            PUSH_START=$((8 * 60 + 10))
+            PUSH_END=$((8 * 60 + 35))
+
+            if [ "$NOW_MIN" -lt "$PUSH_START" ] || [ "$NOW_MIN" -gt "$PUSH_END" ]; then
+              echo "should_run=false" >> "$GITHUB_OUTPUT"
+              echo "reason=outside_primary_recovery_window" >> "$GITHUB_OUTPUT"
+              echo "A4 push trigger ignored outside 08:10-08:35 Asia/Taipei."
+              exit 0
+            fi
+
+            if [ ! -f status/a4/recovery_trigger.json ]; then
+              echo "should_run=false" >> "$GITHUB_OUTPUT"
+              echo "reason=missing_trigger_payload" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            TRIGGER_DATE=$(jq -r '.date // ""' status/a4/recovery_trigger.json)
+            TRIGGER_BY=$(jq -r '.requested_by // ""' status/a4/recovery_trigger.json)
+            TRIGGER_ATTEMPT=$(jq -r '.attempt // -1' status/a4/recovery_trigger.json)
+
+            if [ "$TRIGGER_DATE" != "$DATE_TW" ]; then
+              echo "should_run=false" >> "$GITHUB_OUTPUT"
+              echo "reason=stale_trigger_date" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            case "$TRIGGER_BY" in
+              ChatGPT_A4_PrimaryClock|ChatGPT_A4_Watchdog) ;;
+              *)
+                echo "should_run=false" >> "$GITHUB_OUTPUT"
+                echo "reason=unauthorized_trigger_source" >> "$GITHUB_OUTPUT"
+                exit 0
+                ;;
+            esac
+
+            if ! [[ "$TRIGGER_ATTEMPT" =~ ^[0-2]$ ]]; then
+              echo "should_run=false" >> "$GITHUB_OUTPUT"
+              echo "reason=invalid_trigger_attempt" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+
           echo "should_run=true" >> "$GITHUB_OUTPUT"
-          echo "reason=not_completed" >> "$GITHUB_OUTPUT"
+          echo "reason=authorized_live_start" >> "$GITHUB_OUTPUT"
 
       - name: Python
         if: steps.guard.outputs.should_run == 'true'
