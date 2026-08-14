@@ -1,7 +1,7 @@
 {
   "component": "A4_001C",
-  "requested_at": "2026-08-14T18:00:00+08:00",
-  "requested_by": "ChatGPT_A4_ProductionAudit",
-  "reason": "final_gate_timing_and_status_retry_validation",
-  "attempt": 4
+  "requested_at": "2026-08-14T18:01:30+08:00",
+  "requested_by": "ChatGPT_A4_Watchdog_FailureTest",
+  "reason": "failed_production_job_must_trigger_recovery_test",
+  "attempt": 5
 }
