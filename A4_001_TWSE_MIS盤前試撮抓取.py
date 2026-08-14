@@ -454,11 +454,13 @@ def run_live(stocks: list[Stock]) -> int:
         print(json.dumps(report, ensure_ascii=False))
         return 3
 
+    # Warm the TWSE MIS session before 08:30 so the first market request does not
+    # pay connection/cookie warmup latency after the pre-open window begins.
+    session = make_session(warmup=True)
+
     while phase_for(now_tw().time()) == "WAIT":
         remaining = (start_at - now_tw()).total_seconds()
         time.sleep(max(0.2, min(5.0, remaining)))
-
-    session = make_session(warmup=True)
     normalized: list[dict[str, Any]] = []
     request_count = 0
     error_count = 0
