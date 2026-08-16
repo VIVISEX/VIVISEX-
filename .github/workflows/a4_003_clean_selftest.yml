@@ -1,0 +1,32 @@
+name: QTS A4_003 CLEAN Layer SelfTest
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - A4_003_TrialRawClean.py
+      - .github/workflows/a4_003_clean_selftest.yml
+
+permissions:
+  contents: read
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Compile check
+        run: python -m py_compile A4_003_TrialRawClean.py
+
+      - name: Run CLEAN self-test
+        run: python A4_003_TrialRawClean.py --self-test
