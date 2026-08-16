@@ -10,7 +10,11 @@ on:
       - .github/workflows/a4_003_clean_selftest.yml
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: qts-a4-003-clean-selftest
+  cancel-in-progress: false
 
 jobs:
   selftest:
@@ -19,6 +23,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v6
@@ -28,5 +34,33 @@ jobs:
       - name: Compile check
         run: python -m py_compile A4_003_TrialRawClean.py
 
-      - name: Run CLEAN self-test
-        run: python A4_003_TrialRawClean.py --self-test
+      - name: Run CLEAN self-test and persist evidence
+        shell: bash
+        run: |
+          set +e
+          mkdir -p status/a4
+          python A4_003_TrialRawClean.py --self-test > /tmp/a4_003_result.json
+          RC=$?
+          set -e
+          cat /tmp/a4_003_result.json
+          cp /tmp/a4_003_result.json status/a4/a4_003_clean_selftest_latest.json
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add status/a4/a4_003_clean_selftest_latest.json
+          git commit -m "A4_003 selftest evidence run ${GITHUB_RUN_ID}" || true
+
+          for attempt in 1 2 3 4 5; do
+            if git push origin HEAD:main; then
+              break
+            fi
+            if [ "$attempt" -eq 5 ]; then
+              echo "failed to persist A4_003 selftest evidence after 5 attempts"
+              exit 91
+            fi
+            git fetch origin main
+            git rebase origin/main
+            sleep $attempt
+          done
+
+          exit "$RC"
