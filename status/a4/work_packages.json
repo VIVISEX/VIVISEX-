@@ -1,6 +1,6 @@
 {
   "registry": "QTS_A4_ENGINEERING_QUEUE",
-  "updated_at": "2026-08-15T00:15:00+08:00",
+  "updated_at": "2026-08-16T11:13:44+08:00",
   "governance": {
     "common_rules": "QTS 共通最高規則",
     "handoff": "A4 ENGINEERING HANDOFF V1.0",
@@ -17,23 +17,11 @@
       "AUDIT"
     ],
     "branch_pass_policy": "CANDIDATE_READY_ONLY_UNTIL_CENTRAL_ACCEPTANCE",
-    "missing_data_policy": [
-      "N/A",
-      "WAITING",
-      "SOURCE_GAP",
-      "BLOCKED"
-    ],
+    "missing_data_policy": ["N/A", "WAITING", "SOURCE_GAP", "BLOCKED"],
     "lookahead_policy": "D_DAY_USES_ONLY_DATA_AVAILABLE_AT_D",
     "traceability_required": [
-      "DATA_KEY",
-      "SOURCE",
-      "SOURCE_DATE",
-      "AVAILABLE_AT",
-      "AS_OF_DATE",
-      "VERSION",
-      "RUN_ID",
-      "STRATEGY_ID",
-      "FUND_ID"
+      "DATA_KEY", "SOURCE", "SOURCE_DATE", "AVAILABLE_AT", "AS_OF_DATE",
+      "VERSION", "RUN_ID", "STRATEGY_ID", "FUND_ID"
     ]
   },
   "critical_path": [
@@ -52,30 +40,31 @@
       "scope": "Trial Raw -> Indicative Return/Volume -> Bid/Ask Depth -> Order Imbalance -> Price Stability -> Spoofing Risk -> Expected Open -> 09:00 Actual Open -> 09:30 Follow-through -> Forecast Error -> Calibration",
       "status": "PLANNED",
       "dependency_status": "DEPENDENCY_PENDING",
-      "depends_on": [
-        "A4_EXISTING_PRODUCTION_HARDENING_REAL_TRADING_DAY_ACCEPTANCE_PASS"
-      ],
-      "start_condition": "DO_NOT_START_UNTIL_DEPENDENCY_PASS",
+      "depends_on": ["A4_EXISTING_PRODUCTION_HARDENING_REAL_TRADING_DAY_ACCEPTANCE_PASS"],
+      "start_condition": "DO_NOT_CONNECT_TO_PRODUCTION_UNTIL_DEPENDENCY_PASS",
       "priority": "AFTER_CRITICAL_PATH",
       "may_interrupt_current_construction": false,
+      "prepared_submodules": [
+        {
+          "component": "A4_003",
+          "name": "Trial Raw CLEAN Layer",
+          "version": "A4_003_CLEAN_V1.0.1",
+          "status": "CANDIDATE_READY_ISOLATED",
+          "production_connected": false,
+          "scheduled": false,
+          "central_write": false,
+          "selftest": "PASS",
+          "selftest_run_id": "31923741237"
+        }
+      ],
       "future_features": [
-        "Indicative Return",
-        "Indicative Volume",
-        "Trial Order Imbalance",
-        "Trial Bid Depth",
-        "Trial Ask Depth",
-        "Trial Price Stability",
-        "Spoofing Risk",
-        "Open vs Trial Error"
+        "Indicative Return", "Indicative Volume", "Trial Order Imbalance",
+        "Trial Bid Depth", "Trial Ask Depth", "Trial Price Stability",
+        "Spoofing Risk", "Open vs Trial Error"
       ],
       "unified_outputs": [
-        "PREOPEN_DIRECTION",
-        "PREOPEN_CONFIDENCE",
-        "ORDER_IMBALANCE",
-        "SPOOFING_RISK",
-        "EXPECTED_OPEN",
-        "ACTUAL_OPEN",
-        "FORECAST_ERROR"
+        "PREOPEN_DIRECTION", "PREOPEN_CONFIDENCE", "ORDER_IMBALANCE",
+        "SPOOFING_RISK", "EXPECTED_OPEN", "ACTUAL_OPEN", "FORECAST_ERROR"
       ],
       "boundary": "A4 does not own long-horizon bull/bear regime; future Central Regime Snapshot is context only"
     }
