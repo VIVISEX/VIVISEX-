@@ -1,0 +1,16 @@
+{
+  "component": "A4_001Q",
+  "version": "A4_001Q_PREMARKET_QUALITY_V1.0.0",
+  "mode": "self_test",
+  "checks": {
+    "pz_is_indicative_price": true,
+    "dash_last_price_does_not_mask_pz": true,
+    "ps_is_indicative_volume": true,
+    "normal_preopen_is_ready": true,
+    "early_cache_is_not_ready": true,
+    "partial_book_is_blocked": true,
+    "open_fields_separated": true,
+    "stale_date_blocked": true
+  },
+  "pass": true
+}
