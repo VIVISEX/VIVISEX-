@@ -1,0 +1,41 @@
+name: QTS A4_004 Order Imbalance SelfTest
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - A4_004_OrderImbalanceEngine.py
+      - .github/workflows/a4_004_oi_selftest.yml
+
+permissions:
+  contents: write
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Compile
+        run: python -m py_compile A4_004_OrderImbalanceEngine.py
+      - name: Self test
+        run: python A4_004_OrderImbalanceEngine.py --self-test
+      - name: Persist evidence
+        if: always()
+        run: |
+          if [ -f status/a4/a4_004_oi_selftest_latest.json ]; then
+            git config user.name "qts-a4-bot"
+            git config user.email "qts-a4-bot@users.noreply.github.com"
+            git add status/a4/a4_004_oi_selftest_latest.json
+            if ! git diff --cached --quiet; then
+              git commit -m "A4_004 selftest evidence run ${{ github.run_id }}"
+              git push
+            fi
+          fi
