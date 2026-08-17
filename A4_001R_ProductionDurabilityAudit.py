@@ -4,6 +4,7 @@ import importlib.util
 import json
 import math
 import statistics
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
@@ -13,11 +14,16 @@ from zoneinfo import ZoneInfo
 import requests
 
 TZ = ZoneInfo("Asia/Taipei")
-VERSION = "A4_001R_DURABILITY_V1.0.0"
+VERSION = "A4_001R_DURABILITY_V1.0.1"
 ROOT = Path(__file__).resolve().parent
 SCRAPER = ROOT / "A4_001_TWSE_MIS盤前試撮抓取.py"
 OUT = ROOT / "status" / "a4" / "a4_001r_durability_latest.json"
 TWSE_ALL = "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"
+
+
+def write_report(report: dict[str, Any]) -> None:
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    OUT.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def load_scraper():
@@ -25,6 +31,7 @@ def load_scraper():
     if spec is None or spec.loader is None:
         raise RuntimeError("cannot load production scraper")
     mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod
     spec.loader.exec_module(mod)
     return mod
 
@@ -104,7 +111,7 @@ def repeated_transport(mod, stocks, repeats: int) -> dict[str, Any]:
     }
 
 
-def deterministic_unit_stress(mod, loops: int = 1000) -> dict[str, Any]:
+def deterministic_unit_stress(mod, loops: int = 10000) -> dict[str, Any]:
     item = {
         "ex": "tse", "c": "2330", "n": "TSMC", "d": "20260817", "t": "08:55:00",
         "ts": "1", "z": "-", "pz": "2410", "ps": "123", "v": "1000", "y": "2395",
@@ -130,25 +137,17 @@ def deterministic_unit_stress(mod, loops: int = 1000) -> dict[str, Any]:
     }
 
 
-def main() -> int:
+def run() -> dict[str, Any]:
     mod = load_scraper()
     codes = official_universe(200)
-
-    # Repeated actual TWSE transport. Keep traffic controlled: 5x small/medium, 3x large.
     sizes_repeats = [(5, 5), (20, 5), (50, 5), (100, 3), (200, 3)]
     scale: dict[str, Any] = {}
     for size, repeats in sizes_repeats:
         scale[str(size)] = repeated_transport(mod, make_stocks(mod, codes[:size]), repeats)
-
-    unit = deterministic_unit_stress(mod, loops=10000)
-
-    # Production decision gates:
-    # 1) 5/20 must be fully reliable and every measured cycle <=5 sec.
-    # 2) 50/100/200 are capacity probes; if >5 sec they are NOT eligible for single-source 5s polling.
+    unit = deterministic_unit_stress(mod)
     tier1_ok = scale["5"]["pass"] and scale["20"]["pass"] and scale["20"]["within_5s_all"]
     large_polling_ok = all(scale[str(n)]["pass"] and scale[str(n)]["within_5s_all"] for n in (50, 100, 200))
-
-    report = {
+    return {
         "component": "A4_001R",
         "version": VERSION,
         "checked_at": datetime.now(TZ).isoformat(),
@@ -168,10 +167,23 @@ def main() -> int:
         ),
         "pass": bool(unit["pass"] and tier1_ok),
     }
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def main() -> int:
+    try:
+        report = run()
+    except Exception as exc:
+        report = {
+            "component": "A4_001R",
+            "version": VERSION,
+            "checked_at": datetime.now(TZ).isoformat(),
+            "pass": False,
+            "failure_type": "AUDIT_INFRA_OR_CODE",
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+    write_report(report)
     print(json.dumps(report, ensure_ascii=False))
-    return 0 if report["pass"] else 2
+    return 0 if report.get("pass") else 2
 
 
 if __name__ == "__main__":
