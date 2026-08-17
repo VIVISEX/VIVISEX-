@@ -1,0 +1,295 @@
+{
+  "component": "A4_001R",
+  "version": "A4_001R_DURABILITY_V1.0.1",
+  "checked_at": "2026-08-18T00:16:17.680088+08:00",
+  "official_universe_source": "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",
+  "batch_size": 50,
+  "poll_seconds": 5.0,
+  "unit_stress": {
+    "loops": 10000,
+    "elapsed_seconds": 0.0822,
+    "unique_outputs": 1,
+    "pass": true
+  },
+  "scale": {
+    "5": {
+      "symbols": 5,
+      "repeats": 5,
+      "runs": [
+        {
+          "symbols": 5,
+          "elapsed_seconds": 0.1779,
+          "requests": 1,
+          "returned_symbols": 5,
+          "coverage": 1.0,
+          "fallback_batches": 0,
+          "errors": [],
+          "pass": true
+        },
+        {
+          "symbols": 5,
+          "elapsed_seconds": 0.1672,
+          "requests": 1,
+          "returned_symbols": 5,
+          "coverage": 1.0,
+          "fallback_batches": 0,
+          "errors": [],
+          "pass": true
+        },
+        {
+          "symbols": 5,
+          "elapsed_seconds": 0.1689,
+          "requests": 1,
+          "returned_symbols": 5,
+          "coverage": 1.0,
+          "fallback_batches": 0,
+          "errors": [],
+          "pass": true
+        },
+        {
+          "symbols": 5,
+          "elapsed_seconds": 0.1703,
+          "requests": 1,
+          "returned_symbols": 5,
+          "coverage": 1.0,
+          "fallback_batches": 0,
+          "errors": [],
+          "pass": true
+        },
+        {
+          "symbols": 5,
+          "elapsed_seconds": 0.1709,
+          "requests": 1,
+          "returned_symbols": 5,
+          "coverage": 1.0,
+          "fallback_batches": 0,
+          "errors": [],
+          "pass": true
+        }
+      ],
+      "successes": 5,
+      "min_seconds": 0.1672,
+      "median_seconds": 0.1703,
+      "max_seconds": 0.1779,
+      "p95_seconds": 0.1779,
+      "within_5s_all": true,
+      "pass": true
+    },
+    "20": {
+      "symbols": 20,
+      "repeats": 5,
+      "runs": [
+        {
+          "symbols": 20,
+          "elapsed_seconds": 0.1798,
+          "requests": 1,
+          "returned_symbols": 20,
+          "coverage": 1.0,
+          "fallback_batches": 0,
+          "errors": [],
+          "pass": true
+        },
+        {
+          "symbols": 20,
+          "elapsed_seconds": 0.1714,
+          "requests": 1,
+          "returned_symbols": 20,
+          "coverage": 1.0,
+          "fallback_batches": 0,
+          "errors": [],
+          "pass": true
+        },
+        {
+          "symbols": 20,
+          "elapsed_seconds": 0.1702,
+          "requests": 1,
+          "returned_symbols": 20,
+          "coverage": 1.0,
+          "fallback_batches": 0,
+          "errors": [],
+          "pass": true
+        },
+        {
+          "symbols": 20,
+          "elapsed_seconds": 0.1696,
+          "requests": 1,
+          "returned_symbols": 20,
+          "coverage": 1.0,
+          "fallback_batches": 0,
+          "errors": [],
+          "pass": true
+        },
+        {
+          "symbols": 20,
+          "elapsed_seconds": 0.1691,
+          "requests": 1,
+          "returned_symbols": 20,
+          "coverage": 1.0,
+          "fallback_batches": 0,
+          "errors": [],
+          "pass": true
+        }
+      ],
+      "successes": 5,
+      "min_seconds": 0.1691,
+      "median_seconds": 0.1702,
+      "max_seconds": 0.1798,
+      "p95_seconds": 0.1798,
+      "within_5s_all": true,
+      "pass": true
+    },
+    "50": {
+      "symbols": 50,
+      "repeats": 5,
+      "runs": [
+        {
+          "symbols": 50,
+          "elapsed_seconds": 0.1809,
+          "requests": 1,
+          "returned_symbols": 50,
+          "coverage": 1.0,
+          "fallback_batches": 0,
+          "errors": [],
+          "pass": true
+        },
+        {
+          "symbols": 50,
+          "elapsed_seconds": 0.1747,
+          "requests": 1,
+          "returned_symbols": 50,
+          "coverage": 1.0,
+          "fallback_batches": 0,
+          "errors": [],
+          "pass": true
+        },
+        {
+          "symbols": 50,
+          "elapsed_seconds": 0.5153,
+          "requests": 1,
+          "returned_symbols": 50,
+          "coverage": 1.0,
+          "fallback_batches": 0,
+          "errors": [],
+          "pass": true
+        },
+        {
+          "symbols": 50,
+          "elapsed_seconds": 0.1711,
+          "requests": 1,
+          "returned_symbols": 50,
+          "coverage": 1.0,
+          "fallback_batches": 0,
+          "errors": [],
+          "pass": true
+        },
+        {
+          "symbols": 50,
+          "elapsed_seconds": 0.1718,
+          "requests": 1,
+          "returned_symbols": 50,
+          "coverage": 1.0,
+          "fallback_batches": 0,
+          "errors": [],
+          "pass": true
+        }
+      ],
+      "successes": 5,
+      "min_seconds": 0.1711,
+      "median_seconds": 0.1747,
+      "max_seconds": 0.5153,
+      "p95_seconds": 0.5153,
+      "within_5s_all": true,
+      "pass": true
+    },
+    "100": {
+      "symbols": 100,
+      "repeats": 3,
+      "runs": [
+        {
+          "symbols": 100,
+          "elapsed_seconds": 0.344,
+          "requests": 2,
+          "returned_symbols": 100,
+          "coverage": 1.0,
+          "fallback_batches": 0,
+          "errors": [],
+          "pass": true
+        },
+        {
+          "symbols": 100,
+          "elapsed_seconds": 0.3441,
+          "requests": 2,
+          "returned_symbols": 100,
+          "coverage": 1.0,
+          "fallback_batches": 0,
+          "errors": [],
+          "pass": true
+        },
+        {
+          "symbols": 100,
+          "elapsed_seconds": 0.343,
+          "requests": 2,
+          "returned_symbols": 100,
+          "coverage": 1.0,
+          "fallback_batches": 0,
+          "errors": [],
+          "pass": true
+        }
+      ],
+      "successes": 3,
+      "min_seconds": 0.343,
+      "median_seconds": 0.344,
+      "max_seconds": 0.3441,
+      "p95_seconds": 0.3441,
+      "within_5s_all": true,
+      "pass": true
+    },
+    "200": {
+      "symbols": 200,
+      "repeats": 3,
+      "runs": [
+        {
+          "symbols": 200,
+          "elapsed_seconds": 0.702,
+          "requests": 4,
+          "returned_symbols": 200,
+          "coverage": 1.0,
+          "fallback_batches": 0,
+          "errors": [],
+          "pass": true
+        },
+        {
+          "symbols": 200,
+          "elapsed_seconds": 1.1872,
+          "requests": 4,
+          "returned_symbols": 200,
+          "coverage": 1.0,
+          "fallback_batches": 0,
+          "errors": [],
+          "pass": true
+        },
+        {
+          "symbols": 200,
+          "elapsed_seconds": 0.6864,
+          "requests": 4,
+          "returned_symbols": 200,
+          "coverage": 1.0,
+          "fallback_batches": 0,
+          "errors": [],
+          "pass": true
+        }
+      ],
+      "successes": 3,
+      "min_seconds": 0.6864,
+      "median_seconds": 0.702,
+      "max_seconds": 1.1872,
+      "p95_seconds": 1.1872,
+      "within_5s_all": true,
+      "pass": true
+    }
+  },
+  "tier1_20_transport_candidate": true,
+  "large_universe_5s_twse_polling_candidate": true,
+  "architecture_decision": "TWSE_MIS_OK_FOR_TIER1_UP_TO_20_AND_LARGE_UNIVERSE_OK",
+  "pass": true
+}
