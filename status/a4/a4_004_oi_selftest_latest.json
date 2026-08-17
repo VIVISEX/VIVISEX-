@@ -1,0 +1,19 @@
+{
+  "component": "A4_004",
+  "version": "A4_004_OI_V1.0.0",
+  "mode": "self_test",
+  "checked_at": "2026-08-17T15:39:47.290101+08:00",
+  "checks": {
+    "buy_formula": true,
+    "buy_classification": true,
+    "sell_classification": true,
+    "balanced_classification": true,
+    "signed_range": true,
+    "partial_book_blocked": true,
+    "source_gap_blocked": true,
+    "zero_depth_blocked": true,
+    "version_guard": true,
+    "no_input_mutation": true
+  },
+  "pass": true
+}
