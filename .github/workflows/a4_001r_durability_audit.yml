@@ -36,18 +36,36 @@ jobs:
       - name: Persist evidence
         if: always()
         run: |
-          if [ -f status/a4/a4_001r_durability_latest.json ]; then
-            git config user.name "qts-a4-bot"
-            git config user.email "qts-a4-bot@users.noreply.github.com"
-            git add status/a4/a4_001r_durability_latest.json
-            if ! git diff --cached --quiet; then
-              git commit -m "A4_001R durability evidence run ${{ github.run_id }}"
-              for i in 1 2 3 4 5; do
-                if git push; then exit 0; fi
-                git fetch origin main
-                git rebase origin/main
-                sleep $((i*2))
-              done
-              exit 1
-            fi
+          set -euo pipefail
+          SRC=status/a4/a4_001r_durability_latest.json
+          if [ ! -f "$SRC" ]; then
+            echo "No durability evidence file"
+            exit 1
           fi
+
+          cp "$SRC" /tmp/a4_001r_durability.json
+          git config user.name "qts-a4-bot"
+          git config user.email "qts-a4-bot@users.noreply.github.com"
+
+          RUN_FILE="status/a4/a4_001r_durability_${{ github.run_id }}_attempt${{ github.run_attempt }}.json"
+
+          for i in 1 2 3 4 5; do
+            git fetch origin main
+            git reset --hard origin/main
+            mkdir -p status/a4
+            cp /tmp/a4_001r_durability.json status/a4/a4_001r_durability_latest.json
+            cp /tmp/a4_001r_durability.json "$RUN_FILE"
+            git add status/a4/a4_001r_durability_latest.json "$RUN_FILE"
+
+            if git diff --cached --quiet; then
+              echo "Evidence already identical"
+              exit 0
+            fi
+
+            git commit -m "A4_001R durability evidence run ${{ github.run_id }} attempt ${{ github.run_attempt }}"
+            if git push origin main; then
+              exit 0
+            fi
+            sleep $((i*2))
+          done
+          exit 1
