@@ -1,0 +1,16 @@
+{
+  "component": "A4_002",
+  "version": "A4_002_STORAGE_V1.0.0",
+  "mode": "self_test",
+  "checked_at": "2026-08-17T15:59:40.384309+08:00",
+  "checks": {
+    "rows_counted": true,
+    "sha256_present": true,
+    "immutable_object_path": true,
+    "partition_field": true,
+    "cluster_fields": true,
+    "dedup_key": true,
+    "no_cloud_write_in_selftest": true
+  },
+  "pass": true
+}
