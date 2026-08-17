@@ -1,9 +1,9 @@
 {
   "component": "A4_001A",
-  "status": "WORKFLOW_GUARD_SELFTEST",
-  "date": "2026-08-14",
+  "status": "PRIMARY_TRIGGER_REQUESTED",
+  "date": "2026-08-17",
   "attempt": 0,
-  "requested_at": "2026-08-14T17:56:42+08:00",
-  "reason": "exact_schedule_production_route_outside_window_test",
+  "requested_at": "2026-08-17T08:16:16+08:00",
+  "reason": "external_primary_clock_0815",
   "requested_by": "ChatGPT_A4_PrimaryClock"
 }
