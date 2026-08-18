@@ -13,6 +13,12 @@ on:
           - env_test
           - live
   schedule:
+    # Asia/Taipei Mon-Fri 07:30, then multiple independent backups.
+    # GitHub schedule is best-effort, so Production must not depend on one cron edge.
+    - cron: "30 23 * * 0-4"
+    - cron: "0 0 * * 1-5"
+    - cron: "10 0 * * 1-5"
+    - cron: "20 0 * * 1-5"
     - cron: "25 0 * * 1-5"
   push:
     branches:
@@ -30,7 +36,7 @@ concurrency:
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 150
 
     env:
       TZ: Asia/Taipei
@@ -93,13 +99,13 @@ jobs:
             HH=$(TZ=Asia/Taipei date +%H)
             MM=$(TZ=Asia/Taipei date +%M)
             NOW_MIN=$((10#$HH * 60 + 10#$MM))
-            PUSH_START=$((8 * 60 + 10))
+            PUSH_START=$((7 * 60 + 30))
             PUSH_END=$((8 * 60 + 35))
 
             if [ "$NOW_MIN" -lt "$PUSH_START" ] || [ "$NOW_MIN" -gt "$PUSH_END" ]; then
               echo "should_run=false" >> "$GITHUB_OUTPUT"
               echo "reason=outside_primary_recovery_window" >> "$GITHUB_OUTPUT"
-              echo "A4 push trigger ignored outside 08:10-08:35 Asia/Taipei."
+              echo "A4 push trigger ignored outside 07:30-08:35 Asia/Taipei."
               exit 0
             fi
 
@@ -160,9 +166,12 @@ jobs:
           SS=$(TZ=Asia/Taipei date +%S)
           NOW_SEC=$((10#$HH * 3600 + 10#$MM * 60 + 10#$SS))
           TARGET_SEC=$((8 * 3600 + 28 * 60 + 30))
-          if [ "$NOW_SEC" -lt "$TARGET_SEC" ]; then
+          END_SEC=$((9 * 3600 + 30 * 60))
+          if [ "$NOW_SEC" -ge "$END_SEC" ]; then
+            echo "Runner started after 09:30; scraper will fail closed."
+          elif [ "$NOW_SEC" -lt "$TARGET_SEC" ]; then
             WAIT_SEC=$((TARGET_SEC - NOW_SEC))
-            echo "Waiting ${WAIT_SEC}s so the official market gate is checked close to pre-open."
+            echo "Runner is awake early. Waiting ${WAIT_SEC}s until final market gate."
             sleep "$WAIT_SEC"
           else
             echo "Already at/after 08:28:30; run final market gate immediately."
