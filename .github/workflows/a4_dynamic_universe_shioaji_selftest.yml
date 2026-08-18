@@ -10,7 +10,7 @@ on:
       - .github/workflows/a4_dynamic_universe_shioaji_selftest.yml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   selftest:
@@ -22,6 +22,8 @@ jobs:
       GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
@@ -37,15 +39,51 @@ jobs:
         run: python A4_000_BrokerUniverse.py --self-test
       - name: Shioaji schema selftest
         run: python A4_001S_Shioaji_PremarketStream.py --self-test
-      - name: Credential preflight
+      - name: Credential preflight and evidence
         shell: bash
         run: |
+          mkdir -p status/a4
           python - <<'PY'
-          import json,os
+          import json,os,datetime
+          from pathlib import Path
+          def read_json(p):
+              try:return json.loads(Path(p).read_text(encoding='utf-8'))
+              except Exception:return {}
           checks={
             'SJ_API_KEY': bool(os.getenv('SJ_API_KEY','').strip()),
             'SJ_SEC_KEY': bool(os.getenv('SJ_SEC_KEY','').strip()),
             'GOOGLE_SERVICE_ACCOUNT_JSON': bool(os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON','').strip()),
           }
-          print(json.dumps({'credential_presence':checks,'live_ready':all(checks.values())},ensure_ascii=False))
+          u=read_json('output/universe/universe.json').get('report',{})
+          s=read_json('output/shioaji/selftest.json')
+          evidence={
+            'component':'A4_DYNAMIC_UNIVERSE_SHIOAJI_PREFLIGHT',
+            'run_id':'${{ github.run_id }}',
+            'checked_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            'universe_selftest_pass':bool(u.get('pass')),
+            'shioaji_schema_selftest_pass':bool(s.get('pass')),
+            'credential_presence':checks,
+            'live_ready':all(checks.values()),
+            'pass':bool(u.get('pass')) and bool(s.get('pass')),
+          }
+          Path('status/a4/a4_dynamic_shioaji_preflight_latest.json').write_text(json.dumps(evidence,ensure_ascii=False,indent=2),encoding='utf-8')
+          print(json.dumps(evidence,ensure_ascii=False))
           PY
+      - name: Persist evidence
+        if: always()
+        shell: bash
+        run: |
+          if [ ! -f status/a4/a4_dynamic_shioaji_preflight_latest.json ]; then exit 1; fi
+          git config user.name "qts-a4-bot"
+          git config user.email "qts-a4-bot@users.noreply.github.com"
+          RUN_FILE="status/a4/a4_dynamic_shioaji_preflight_${{ github.run_id }}.json"
+          cp status/a4/a4_dynamic_shioaji_preflight_latest.json "$RUN_FILE"
+          git add "$RUN_FILE"
+          git commit -m "A4 dynamic/Shioaji preflight evidence ${{ github.run_id }}"
+          for i in 1 2 3 4 5; do
+            if git push origin main; then exit 0; fi
+            git fetch origin main
+            git rebase origin/main || { git rebase --abort || true; git reset --hard origin/main; git add "$RUN_FILE"; git commit -m "A4 dynamic/Shioaji preflight evidence ${{ github.run_id }}"; }
+            sleep $((i*2))
+          done
+          exit 1
