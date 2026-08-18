@@ -1,0 +1,14 @@
+{
+  "component": "A4_DYNAMIC_UNIVERSE_SHIOAJI_PREFLIGHT",
+  "run_id": "32114304909",
+  "checked_at": "2026-08-18T08:02:08.729781+00:00",
+  "universe_selftest_pass": true,
+  "shioaji_schema_selftest_pass": true,
+  "credential_presence": {
+    "SJ_API_KEY": false,
+    "SJ_SEC_KEY": false,
+    "GOOGLE_SERVICE_ACCOUNT_JSON": false
+  },
+  "live_ready": false,
+  "pass": true
+}
