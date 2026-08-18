@@ -1,9 +1,9 @@
 {
   "component": "A4_001A",
   "status": "PRIMARY_TRIGGER_REQUESTED",
-  "date": "2026-08-17",
+  "date": "2026-08-19",
   "attempt": 0,
-  "requested_at": "2026-08-17T08:16:16+08:00",
+  "requested_at": "2026-08-19T07:37:40+08:00",
   "reason": "external_primary_clock_0815",
   "requested_by": "ChatGPT_A4_PrimaryClock"
 }
