@@ -1,0 +1,51 @@
+name: QTS A4 Dynamic Universe + Shioaji SelfTest
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - A4_000_BrokerUniverse.py
+      - A4_001S_Shioaji_PremarketStream.py
+      - .github/workflows/a4_dynamic_universe_shioaji_selftest.yml
+
+permissions:
+  contents: read
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SJ_API_KEY: ${{ secrets.SJ_API_KEY }}
+      SJ_SEC_KEY: ${{ secrets.SJ_SEC_KEY }}
+      GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install shioaji google-api-python-client google-auth
+      - name: Compile
+        run: |
+          python -m py_compile A4_000_BrokerUniverse.py
+          python -m py_compile A4_001S_Shioaji_PremarketStream.py
+      - name: Universe selftest
+        run: python A4_000_BrokerUniverse.py --self-test
+      - name: Shioaji schema selftest
+        run: python A4_001S_Shioaji_PremarketStream.py --self-test
+      - name: Credential preflight
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json,os
+          checks={
+            'SJ_API_KEY': bool(os.getenv('SJ_API_KEY','').strip()),
+            'SJ_SEC_KEY': bool(os.getenv('SJ_SEC_KEY','').strip()),
+            'GOOGLE_SERVICE_ACCOUNT_JSON': bool(os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON','').strip()),
+          }
+          print(json.dumps({'credential_presence':checks,'live_ready':all(checks.values())},ensure_ascii=False))
+          PY
