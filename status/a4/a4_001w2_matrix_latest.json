@@ -1,0 +1,104 @@
+{
+  "component": "A4_001W2",
+  "version": "A4_001W2_TRANSPORT_MATRIX_V1.0.0",
+  "checked_at": "2026-08-20T00:35:14.651434+08:00",
+  "requested_symbols": 309,
+  "cycles_per_candidate": 10,
+  "interval_seconds": 5.0,
+  "results": [
+    {
+      "batch_size": 120,
+      "primary_workers": 1,
+      "cycles": 10,
+      "successful_cycles": 10,
+      "success_rate": 1.0,
+      "max_elapsed_seconds": 1.5256688759999975,
+      "avg_elapsed_seconds": 1.2336166628000007,
+      "total_request_errors": 0,
+      "failed_cycles": [],
+      "placeholder_union": [
+        "8105"
+      ],
+      "pass": true
+    },
+    {
+      "batch_size": 100,
+      "primary_workers": 1,
+      "cycles": 10,
+      "successful_cycles": 10,
+      "success_rate": 1.0,
+      "max_elapsed_seconds": 2.100653360999999,
+      "avg_elapsed_seconds": 1.4491266281999955,
+      "total_request_errors": 0,
+      "failed_cycles": [],
+      "placeholder_union": [
+        "8105"
+      ],
+      "pass": true
+    },
+    {
+      "batch_size": 80,
+      "primary_workers": 1,
+      "cycles": 10,
+      "successful_cycles": 10,
+      "success_rate": 1.0,
+      "max_elapsed_seconds": 1.131000389999997,
+      "avg_elapsed_seconds": 1.069508232399994,
+      "total_request_errors": 0,
+      "failed_cycles": [],
+      "placeholder_union": [
+        "8105"
+      ],
+      "pass": true
+    },
+    {
+      "batch_size": 60,
+      "primary_workers": 1,
+      "cycles": 10,
+      "successful_cycles": 10,
+      "success_rate": 1.0,
+      "max_elapsed_seconds": 1.8272589389999894,
+      "avg_elapsed_seconds": 1.3740048231000004,
+      "total_request_errors": 0,
+      "failed_cycles": [],
+      "placeholder_union": [
+        "8105"
+      ],
+      "pass": true
+    },
+    {
+      "batch_size": 50,
+      "primary_workers": 1,
+      "cycles": 10,
+      "successful_cycles": 10,
+      "success_rate": 1.0,
+      "max_elapsed_seconds": 3.496308392000003,
+      "avg_elapsed_seconds": 2.0157409507000126,
+      "total_request_errors": 0,
+      "failed_cycles": [],
+      "placeholder_union": [
+        "8105"
+      ],
+      "pass": true
+    }
+  ],
+  "best": {
+    "batch_size": 80,
+    "primary_workers": 1,
+    "cycles": 10,
+    "successful_cycles": 10,
+    "success_rate": 1.0,
+    "max_elapsed_seconds": 1.131000389999997,
+    "avg_elapsed_seconds": 1.069508232399994,
+    "total_request_errors": 0,
+    "failed_cycles": [],
+    "placeholder_union": [
+      "8105"
+    ],
+    "pass": true
+  },
+  "candidate_ready": true,
+  "pass": true,
+  "run_id": "32276338956",
+  "workflow_outcome": "success"
+}
