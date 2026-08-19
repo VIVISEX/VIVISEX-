@@ -11,9 +11,8 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parent
 CORE = ROOT / "A4_001_TWSE_MIS盤前試撮抓取.py"
-ADAPTER_VERSION = "A4_001P_RECOVERY_V1.1.0"
+ADAPTER_VERSION = "A4_001P_RECOVERY_V1.2.0"
 FAST_BATCH_RETRY_TIMEOUT = max(0.35, float(os.getenv("FAST_BATCH_RETRY_TIMEOUT", "0.95")))
-FAST_BATCH_RETRY_WORKERS = max(1, int(os.getenv("FAST_BATCH_RETRY_WORKERS", "1")))
 
 
 def load_core():
@@ -27,8 +26,8 @@ def load_core():
 
 
 def repair_aligned_items(batch: list[Any], items: list[Any], raw: dict[str, Any]) -> list[dict[str, Any]]:
-    # Positional repair is safe only if the response is exactly one-for-one AND
-    # every nonblank code is already at the expected position. Otherwise fail closed.
+    # Safe positional repair requires exact cardinality and all nonblank codes already
+    # matching their requested positions. Any mismatch means no inference: Fail Closed.
     if len(items) != len(batch):
         return [dict(x) if isinstance(x, dict) else {} for x in items]
     for stock, raw_item in zip(batch, items):
@@ -60,12 +59,44 @@ def repair_aligned_items(batch: list[Any], items: list[Any], raw: dict[str, Any]
 def install(mod: Any) -> Any:
     original_fetch_once = mod.fetch_once
     original_normalize = mod.normalize_item
+    original_warmup_pool = mod.warmup_pool
 
     def aligned_fetch_once(batch, timeout, stage):
         result = original_fetch_once(batch, timeout, stage)
         if result.ok and isinstance(result.raw, dict):
             result.items = repair_aligned_items(batch, result.items, result.raw)
         return result
+
+    def reset_main_session() -> None:
+        old = getattr(mod._THREAD_LOCAL, "session", None)
+        if old is not None:
+            try:
+                old.close()
+            except Exception:
+                pass
+        mod._THREAD_LOCAL.session = mod.make_session()
+
+    def persistent_warmup_pool():
+        # Production candidate uses one sequential worker. Warm the SAME main-thread
+        # session that will be reused across all batches and future 5-second cycles.
+        if mod.PRIMARY_WORKERS == 1:
+            return [mod.warmup_one()]
+        return original_warmup_pool()
+
+    def run_sequential(batches, timeout, stage, deadline):
+        results = []
+        for batch in batches:
+            remaining = deadline - time.monotonic() - mod.CYCLE_GUARD_SECONDS
+            if remaining <= 0:
+                results.append(mod.FetchResult(batch, [], None, False, "cycle deadline exhausted", 0.0, stage))
+                continue
+            request_timeout = max(0.20, min(timeout, remaining))
+            result = mod.fetch_once(batch, request_timeout, stage)
+            results.append(result)
+            if not result.ok:
+                # A timed-out/poisoned keep-alive connection must not be reused for rescue.
+                reset_main_session()
+        return results
 
     def placeholder_normalize(item, captured_at, phase):
         row = original_normalize(item, captured_at, phase)
@@ -92,47 +123,39 @@ def install(mod: Any) -> Any:
                         best_items[code] = item
 
         primary_batches = mod.chunks(stocks, mod.BATCH_SIZE)
-        primary = mod.run_parallel(primary_batches, mod.PRIMARY_WORKERS, mod.PRIMARY_TIMEOUT, "primary", cycle_deadline)
+        if mod.PRIMARY_WORKERS == 1:
+            primary = run_sequential(primary_batches, mod.PRIMARY_TIMEOUT, "primary", cycle_deadline)
+        else:
+            primary = mod.run_parallel(primary_batches, mod.PRIMARY_WORKERS, mod.PRIMARY_TIMEOUT, "primary", cycle_deadline)
         all_results.extend(primary)
         absorb(primary)
 
-        # If a whole primary batch timed out/failed, retry that SAME batch first using
-        # a fresh executor/thread/session. This is much faster than immediately exploding
-        # an 80-symbol outage into many small requests inside a 5-second cycle budget.
         failed_batches = [r.requested for r in primary if (not r.ok and r.requested)]
         if failed_batches and time.monotonic() < cycle_deadline - mod.CYCLE_GUARD_SECONDS:
-            fast = mod.run_parallel(
-                failed_batches,
-                min(FAST_BATCH_RETRY_WORKERS, len(failed_batches)),
-                FAST_BATCH_RETRY_TIMEOUT,
-                "retry_failed_batch",
-                cycle_deadline,
-            )
+            # Same-batch retry on a fresh session first. It restores an entire failed batch
+            # with one request and preserves the 5-second cycle budget.
+            fast = run_sequential(failed_batches, FAST_BATCH_RETRY_TIMEOUT, "retry_failed_batch", cycle_deadline)
             all_results.extend(fast)
             absorb(fast)
 
         missing = requested_codes - set(best_items)
         if missing and time.monotonic() < cycle_deadline - mod.CYCLE_GUARD_SECONDS:
             retry_stocks = [by_code[c] for c in sorted(missing)]
-            retry = mod.run_parallel(
-                mod.chunks(retry_stocks, mod.RETRY_BATCH_SIZE),
-                mod.RETRY_WORKERS,
-                mod.RETRY_TIMEOUT,
-                "retry_small_batch",
-                cycle_deadline,
-            )
+            retry_batches = mod.chunks(retry_stocks, mod.RETRY_BATCH_SIZE)
+            if mod.RETRY_WORKERS == 1:
+                retry = run_sequential(retry_batches, mod.RETRY_TIMEOUT, "retry_small_batch", cycle_deadline)
+            else:
+                retry = mod.run_parallel(retry_batches, mod.RETRY_WORKERS, mod.RETRY_TIMEOUT, "retry_small_batch", cycle_deadline)
             all_results.extend(retry)
             absorb(retry)
 
         missing = requested_codes - set(best_items)
         if missing and len(missing) <= mod.SINGLE_FALLBACK_LIMIT and time.monotonic() < cycle_deadline - mod.CYCLE_GUARD_SECONDS:
-            singles = mod.run_parallel(
-                [[by_code[c]] for c in sorted(missing)],
-                min(mod.RETRY_WORKERS, len(missing)),
-                mod.SINGLE_TIMEOUT,
-                "single_fallback",
-                cycle_deadline,
-            )
+            single_batches = [[by_code[c]] for c in sorted(missing)]
+            if mod.RETRY_WORKERS == 1:
+                singles = run_sequential(single_batches, mod.SINGLE_TIMEOUT, "single_fallback", cycle_deadline)
+            else:
+                singles = mod.run_parallel(single_batches, min(mod.RETRY_WORKERS, len(missing)), mod.SINGLE_TIMEOUT, "single_fallback", cycle_deadline)
             all_results.extend(singles)
             absorb(singles)
 
@@ -142,8 +165,9 @@ def install(mod: Any) -> Any:
             if isinstance(item, dict) and item.get("_qts_placeholder")
         )
         diagnostics = {
-            "version": "1.4.2",
+            "version": "1.4.3",
             "adapter_version": ADAPTER_VERSION,
+            "transport_mode": "persistent_sequential" if mod.PRIMARY_WORKERS == 1 else "parallel",
             "request_attempts": len(all_results),
             "request_errors": sum(1 for r in all_results if not r.ok),
             "primary_requests": len(primary),
@@ -172,8 +196,9 @@ def install(mod: Any) -> Any:
 
     mod.fetch_once = aligned_fetch_once
     mod.normalize_item = placeholder_normalize
+    mod.warmup_pool = persistent_warmup_pool
     mod.capture_cycle = robust_capture_cycle
-    mod.VERSION = "1.4.2"
+    mod.VERSION = "1.4.3"
     return mod
 
 
@@ -192,25 +217,29 @@ def selftest() -> int:
     placeholder_row = mod.normalize_item(items[0], mod.now_tw(), "PREOPEN")
     real_row = mod.normalize_item(items[1], mod.now_tw(), "PREOPEN")
 
-    # A nonblank code at the wrong position must disable positional repair.
     unsafe_raw = {"msgArray": [{"c": "2330"}, {"c": ""}], "queryTime": {"sysDate": "20260819"}}
     unsafe = repair_aligned_items(batch, unsafe_raw["msgArray"], unsafe_raw)
 
-    # Fault-inject: first primary batch fails completely; same-batch fast retry succeeds.
     stocks = [mod.Stock("TSE", str(1000 + i), f"tse_{1000+i}.tw") for i in range(4)]
-    original_run_parallel = mod.run_parallel
+    original_fetch = mod.fetch_once
+    original_pw = mod.PRIMARY_WORKERS
+    original_rw = mod.RETRY_WORKERS
+    calls = []
     try:
-        def fake_run_parallel(batches, workers, timeout, stage, deadline):
-            if stage == "primary":
-                return [mod.FetchResult(batches[0], [], None, False, "forced timeout", 0.1, stage)]
-            if stage == "retry_failed_batch":
-                return [mod.FetchResult(batches[0], [{"c": s.code, "d": "20260819"} for s in batches[0]], {"rtcode": "0000"}, True, None, 0.1, stage)]
-            return []
-        mod.run_parallel = fake_run_parallel
+        mod.PRIMARY_WORKERS = 1
+        mod.RETRY_WORKERS = 1
+        def fake_fetch(batch, timeout, stage):
+            calls.append(stage)
+            if stage == "primary" and calls.count("primary") == 1:
+                return mod.FetchResult(batch, [], None, False, "forced timeout", 0.1, stage)
+            return mod.FetchResult(batch, [{"c": s.code, "d": "20260819"} for s in batch], {"rtcode": "0000"}, True, None, 0.1, stage)
+        mod.fetch_once = fake_fetch
         recovered, diag = mod.capture_cycle(stocks, time.monotonic() + 2.0)
         fast_retry_ok = recovered[0].ok and diag["returned_symbols"] == 4 and diag["fast_batch_retry_requests"] == 1
     finally:
-        mod.run_parallel = original_run_parallel
+        mod.fetch_once = original_fetch
+        mod.PRIMARY_WORKERS = original_pw
+        mod.RETRY_WORKERS = original_rw
 
     checks = {
         "placeholder_code_restored": items[0]["c"] == "8105",
@@ -222,6 +251,7 @@ def selftest() -> int:
         "no_fake_price": placeholder_row.get("raw_pz") is None and placeholder_row.get("last_price") == "-",
         "mismatch_fails_closed": str(unsafe[1].get("c", "")) == "",
         "failed_batch_fast_retry_recovers": fast_retry_ok,
+        "persistent_sequential_selected": diag.get("transport_mode") == "persistent_sequential",
     }
     report = {"component": "A4_001P", "version": ADAPTER_VERSION, "checks": checks, "pass": all(checks.values())}
     print(json.dumps(report, ensure_ascii=False))
