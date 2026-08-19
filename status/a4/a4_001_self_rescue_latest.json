@@ -1,0 +1,10 @@
+{
+  "component": "A4_001XYZ_SELF_RESCUE_VALIDATION",
+  "run_id": "32273676964",
+  "run_attempt": "1",
+  "job_status": "failure",
+  "supervisor_selftest": null,
+  "recovery_validation": null,
+  "real_repeat_probe": null,
+  "pass": false
+}
