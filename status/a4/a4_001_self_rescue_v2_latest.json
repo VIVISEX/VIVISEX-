@@ -1,0 +1,222 @@
+{
+  "component": "A4_001XYZ_SELF_RESCUE_VALIDATION_V2",
+  "run_id": "32275199384",
+  "run_attempt": "1",
+  "job_status": "success",
+  "step_outcomes": {
+    "placeholder": "success",
+    "supervisor": "success",
+    "raw_audit": "success",
+    "rescue": "success",
+    "real_probes": "success"
+  },
+  "supervisor_selftest": {
+    "component": "A4_001X",
+    "version": "A4_001X_SUPERVISOR_V1.0.2",
+    "mode": "selftest",
+    "checks": {
+      "normal_no_restart": true,
+      "crash_recovered": true,
+      "hang_recovered": true,
+      "bounded_failure": true
+    },
+    "cases": {
+      "normal": {
+        "component": "A4_001X",
+        "version": "A4_001X_SUPERVISOR_V1.0.2",
+        "checked_at": "2026-08-20T00:19:15.664918+08:00",
+        "command": [
+          "/opt/hostedtoolcache/Python/3.12.13/x64/bin/python",
+          "/tmp/tmp_09xgnim/worker.py"
+        ],
+        "launches": 1,
+        "restarts": 0,
+        "max_restarts": 2,
+        "heartbeat_stale_seconds": 0.7,
+        "launch_grace_seconds": 0.45,
+        "final_returncode": 0,
+        "recovery_reasons": [],
+        "bounded_recovery": true,
+        "pass": true
+      },
+      "crash_once": {
+        "component": "A4_001X",
+        "version": "A4_001X_SUPERVISOR_V1.0.2",
+        "checked_at": "2026-08-20T00:19:16.568477+08:00",
+        "command": [
+          "/opt/hostedtoolcache/Python/3.12.13/x64/bin/python",
+          "/tmp/tmp_09xgnim/worker.py"
+        ],
+        "launches": 2,
+        "restarts": 1,
+        "max_restarts": 2,
+        "heartbeat_stale_seconds": 0.7,
+        "launch_grace_seconds": 0.45,
+        "final_returncode": 0,
+        "recovery_reasons": [
+          "PROCESS_EXIT_7"
+        ],
+        "bounded_recovery": true,
+        "pass": true
+      },
+      "hang_once": {
+        "component": "A4_001X",
+        "version": "A4_001X_SUPERVISOR_V1.0.2",
+        "checked_at": "2026-08-20T00:19:18.373891+08:00",
+        "command": [
+          "/opt/hostedtoolcache/Python/3.12.13/x64/bin/python",
+          "/tmp/tmp_09xgnim/worker.py"
+        ],
+        "launches": 2,
+        "restarts": 1,
+        "max_restarts": 2,
+        "heartbeat_stale_seconds": 0.7,
+        "launch_grace_seconds": 0.45,
+        "final_returncode": 0,
+        "recovery_reasons": [
+          "HEARTBEAT_STALE_0.8s"
+        ],
+        "bounded_recovery": true,
+        "pass": true
+      },
+      "always_fail": {
+        "component": "A4_001X",
+        "version": "A4_001X_SUPERVISOR_V1.0.2",
+        "checked_at": "2026-08-20T00:19:18.776813+08:00",
+        "command": [
+          "/opt/hostedtoolcache/Python/3.12.13/x64/bin/python",
+          "/tmp/tmp_09xgnim/worker.py"
+        ],
+        "launches": 3,
+        "restarts": 2,
+        "max_restarts": 2,
+        "heartbeat_stale_seconds": 0.7,
+        "launch_grace_seconds": 0.45,
+        "final_returncode": 9,
+        "recovery_reasons": [
+          "PROCESS_EXIT_9",
+          "PROCESS_EXIT_9",
+          "PROCESS_EXIT_9"
+        ],
+        "bounded_recovery": true,
+        "pass": false
+      }
+    },
+    "pass": true
+  },
+  "recovery_validation": {
+    "component": "A4_001Z",
+    "version": "A4_001Z_SELF_RESCUE_VALIDATION_V1.0.0",
+    "checked_at": "2026-08-20T00:19:19.794116+08:00",
+    "scraper_version": "1.4.0",
+    "checks": {
+      "retry_small_batch_recovers_missing": true,
+      "single_fallback_recovers_missing": true,
+      "unrecoverable_missing_fails_closed": true,
+      "deterministic_20000_loops": true,
+      "cycle_budget_lt_poll": true,
+      "source_gap_bounded": true
+    },
+    "pass": true
+  },
+  "real_repeat_probe": {
+    "component": "A4_001_REAL_REPEAT_PROBE_V2",
+    "runs": 10,
+    "successes": 10,
+    "requested_symbols": [
+      309,
+      309,
+      309,
+      309,
+      309,
+      309,
+      309,
+      309,
+      309,
+      309
+    ],
+    "returned_symbols": [
+      309,
+      309,
+      309,
+      309,
+      309,
+      309,
+      309,
+      309,
+      309,
+      309
+    ],
+    "missing_symbols": [
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "cycle_elapsed_seconds": [
+      0.8038644300000044,
+      0.6270122490000034,
+      0.6283908859999983,
+      0.7839749890000007,
+      0.6289149660000035,
+      0.6335065770000057,
+      0.6259108339999955,
+      0.6443596930000126,
+      0.6385808609999941,
+      0.6376772859999988
+    ],
+    "placeholder_symbols": [
+      [
+        "8105"
+      ],
+      [
+        "8105"
+      ],
+      [
+        "8105"
+      ],
+      [
+        "8105"
+      ],
+      [
+        "8105"
+      ],
+      [
+        "8105"
+      ],
+      [
+        "8105"
+      ],
+      [
+        "8105"
+      ],
+      [
+        "8105"
+      ],
+      [
+        "8105"
+      ]
+    ],
+    "request_errors": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "max_cycle_elapsed_seconds": 0.8038644300000044,
+    "pass": true
+  },
+  "pass": true
+}
