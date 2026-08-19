@@ -13,13 +13,14 @@ on:
           - env_test
           - live
   schedule:
-    # Asia/Taipei Mon-Fri 07:30, then multiple independent backups.
-    # GitHub schedule is best-effort, so Production must not depend on one cron edge.
+    # Asia/Taipei Monday-Friday redundant primary clocks.
     - cron: "30 23 * * 0-4"
+    - cron: "45 23 * * 0-4"
     - cron: "0 0 * * 1-5"
     - cron: "10 0 * * 1-5"
     - cron: "20 0 * * 1-5"
     - cron: "25 0 * * 1-5"
+    - cron: "27 0 * * 1-5"
   push:
     branches:
       - main
@@ -46,15 +47,17 @@ jobs:
       START_TIME: "08:30:00"
       PREOPEN_END: "09:00:00"
       END_TIME: "09:30:00"
-      BATCH_SIZE: "50"
-      MAX_RETRIES: "4"
-      REQUEST_TIMEOUT: "5"
-      RETRY_BASE_SECONDS: "0.35"
-      RETRY_CAP_SECONDS: "2.0"
-      WARMUP_TIMEOUT: "4"
-      ENABLE_SINGLE_FALLBACK: "1"
-      SINGLE_FALLBACK_RETRIES: "2"
-      SINGLE_FALLBACK_TIMEOUT: "4"
+      BATCH_SIZE: "40"
+      PRIMARY_WORKERS: "10"
+      RETRY_BATCH_SIZE: "12"
+      RETRY_WORKERS: "12"
+      SINGLE_FALLBACK_LIMIT: "12"
+      PRIMARY_TIMEOUT: "1.35"
+      RETRY_TIMEOUT: "0.90"
+      SINGLE_TIMEOUT: "0.60"
+      CYCLE_BUDGET_SECONDS: "4.60"
+      CYCLE_GUARD_SECONDS: "0.15"
+      WARMUP_TIMEOUT: "2.0"
       SOURCE_GAP_CONSECUTIVE_CYCLES: "3"
       MAX_REQUEST_ERROR_RATE: "0.02"
       MIN_PREOPEN_COVERAGE: "0.98"
@@ -91,7 +94,7 @@ jobs:
           if git cat-file -e "origin/${DEFAULT_BRANCH}:${COMPLETED_PATH}" 2>/dev/null; then
             echo "should_run=false" >> "$GITHUB_OUTPUT"
             echo "reason=already_completed" >> "$GITHUB_OUTPUT"
-            echo "A4 live run already completed for ${DATE_TW}; duplicate/recovery run will exit cleanly."
+            echo "A4 live run already completed for ${DATE_TW}; duplicate run exits cleanly."
             exit 0
           fi
 
@@ -105,7 +108,6 @@ jobs:
             if [ "$NOW_MIN" -lt "$PUSH_START" ] || [ "$NOW_MIN" -gt "$PUSH_END" ]; then
               echo "should_run=false" >> "$GITHUB_OUTPUT"
               echo "reason=outside_primary_recovery_window" >> "$GITHUB_OUTPUT"
-              echo "A4 push trigger ignored outside 07:30-08:35 Asia/Taipei."
               exit 0
             fi
 
@@ -171,10 +173,10 @@ jobs:
             echo "Runner started after 09:30; scraper will fail closed."
           elif [ "$NOW_SEC" -lt "$TARGET_SEC" ]; then
             WAIT_SEC=$((TARGET_SEC - NOW_SEC))
-            echo "Runner is awake early. Waiting ${WAIT_SEC}s until final market gate."
+            echo "Runner awake early. Waiting ${WAIT_SEC}s until final market gate."
             sleep "$WAIT_SEC"
           else
-            echo "Already at/after 08:28:30; run final market gate immediately."
+            echo "Already at/after 08:28:30; run market gate immediately."
           fi
 
       - name: TWSE trading-day and emergency-closure gate
@@ -201,8 +203,7 @@ jobs:
         if: steps.guard.outputs.should_run == 'true' && steps.market_gate.outputs.should_run == 'true'
         id: scraper
         continue-on-error: true
-        run: |
-          python "A4_001_TWSE_MIS盤前試撮抓取.py"
+        run: python "A4_001_TWSE_MIS盤前試撮抓取.py"
 
       - name: Upload captured data
         if: ${{ always() && steps.guard.outputs.should_run == 'true' }}
@@ -284,21 +285,10 @@ jobs:
                   --arg run_id "$RUN_ID" \
                   --arg run_attempt "$RUN_ATTEMPT" \
                   --arg sha "$EXECUTED_SHA" \
-                  '{
-                    checked_at: $checked_at,
-                    workflow_outcome: $workflow_outcome,
-                    market_status: $market_status,
-                    event_name: $event_name,
-                    run_id: $run_id,
-                    run_attempt: $run_attempt,
-                    source_commit: $sha,
-                    pass: false,
-                    reason: "NO_REPORT_FILE"
-                  }' > status/a4/latest.json
+                  '{checked_at: $checked_at, workflow_outcome: $workflow_outcome, market_status: $market_status, event_name: $event_name, run_id: $run_id, run_attempt: $run_attempt, source_commit: $sha, pass: false, reason: "NO_REPORT_FILE"}' > status/a4/latest.json
           fi
 
           cp status/a4/latest.json "status/a4/${DATE_TW}_${RUN_ID}.json"
-
           if jq -e '.pass == true' status/a4/latest.json >/dev/null; then
             cp status/a4/latest.json "status/a4/${DATE_TW}_COMPLETED.json"
           fi
@@ -315,13 +305,8 @@ jobs:
           else
             git commit -m "A4 status: ${DATE_TW} run ${RUN_ID}"
             for push_attempt in 1 2 3 4 5; do
-              if git push origin "$DEFAULT_BRANCH"; then
-                break
-              fi
-              if [ "$push_attempt" -eq 5 ]; then
-                echo "A4 status push failed after 5 attempts"
-                exit 1
-              fi
+              if git push origin "$DEFAULT_BRANCH"; then break; fi
+              if [ "$push_attempt" -eq 5 ]; then exit 1; fi
               git fetch origin "$DEFAULT_BRANCH"
               git rebase "origin/$DEFAULT_BRANCH"
               sleep $((push_attempt * 2))
@@ -331,29 +316,10 @@ jobs:
       - name: Enforce scraper result
         if: always()
         run: |
-          if [ "${{ steps.guard.outcome }}" != "success" ]; then
-            echo "A4 production guard failed"
-            exit 1
-          fi
-
-          if [ "${{ steps.guard.outputs.should_run }}" != "true" ]; then
-            echo "A4 duplicate/recovery run skipped: ${{ steps.guard.outputs.reason }}"
-            exit 0
-          fi
-
+          if [ "${{ steps.guard.outcome }}" != "success" ]; then exit 1; fi
+          if [ "${{ steps.guard.outputs.should_run }}" != "true" ]; then exit 0; fi
           case "${{ steps.market_gate.outputs.market_status }}" in
-            MARKET_CLOSED*)
-              echo "A4 market closed; capture correctly skipped"
-              exit 0
-              ;;
+            MARKET_CLOSED*) exit 0 ;;
           esac
-
-          if [ "${{ steps.market_gate.outputs.should_run }}" != "true" ]; then
-            echo "A4 trading-day gate did not authorize capture"
-            exit 1
-          fi
-
-          if [ "${{ steps.scraper.outcome }}" != "success" ]; then
-            echo "A4 scraper failed"
-            exit 1
-          fi
+          if [ "${{ steps.market_gate.outputs.should_run }}" != "true" ]; then exit 1; fi
+          if [ "${{ steps.scraper.outcome }}" != "success" ]; then exit 1; fi
