@@ -1,0 +1,95 @@
+name: QTS A4 Emergency Live Capture
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/a4_emergency_capture.yml
+      - status/a4/emergency_trigger.json
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: qts-a4-emergency-live
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      TZ: Asia/Taipei
+      STOCKS_FILE: stocks.csv
+      OUTPUT_DIR: output/mis
+      RUN_MODE: live
+      POLL_SECONDS: "5"
+      START_TIME: "08:30:00"
+      PREOPEN_END: "09:00:00"
+      END_TIME: "09:30:00"
+      BATCH_SIZE: "50"
+      MAX_RETRIES: "4"
+      REQUEST_TIMEOUT: "5"
+      RETRY_BASE_SECONDS: "0.35"
+      RETRY_CAP_SECONDS: "2.0"
+      WARMUP_TIMEOUT: "4"
+      ENABLE_SINGLE_FALLBACK: "1"
+      SINGLE_FALLBACK_RETRIES: "2"
+      SINGLE_FALLBACK_TIMEOUT: "4"
+      SOURCE_GAP_CONSECUTIVE_CYCLES: "3"
+      MAX_REQUEST_ERROR_RATE: "0.02"
+      MIN_PREOPEN_COVERAGE: "0.98"
+      MIN_OPEN_COVERAGE: "0.95"
+      MIN_SYMBOL_COVERAGE: "1.0"
+      MAX_ALLOWED_GAP_SECONDS: "15"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas requests pyarrow
+      - name: Capture immediately
+        id: scraper
+        continue-on-error: true
+        run: python "A4_001_TWSE_MIS盤前試撮抓取.py"
+      - name: Upload partial recovery data
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: qts-a4-emergency-${{ github.run_id }}
+          path: output/mis/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Persist emergency status
+        if: always()
+        shell: bash
+        env:
+          SCRAPER_OUTCOME: ${{ steps.scraper.outcome }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          DATE_TW=$(TZ=Asia/Taipei date +%F)
+          NOW_TW=$(TZ=Asia/Taipei date --iso-8601=seconds)
+          mkdir -p status/a4
+          REPORT="output/mis/report_${DATE_TW}.json"
+          if [ -f "$REPORT" ]; then
+            jq --arg checked_at "$NOW_TW" --arg run_id "$RUN_ID" --arg outcome "$SCRAPER_OUTCOME" '. + {checked_at:$checked_at,run_id:$run_id,workflow_outcome:$outcome,emergency_recovery:true}' "$REPORT" > status/a4/emergency_latest.json
+          else
+            jq -n --arg checked_at "$NOW_TW" --arg run_id "$RUN_ID" --arg outcome "$SCRAPER_OUTCOME" '{checked_at:$checked_at,run_id:$run_id,workflow_outcome:$outcome,emergency_recovery:true,pass:false,reason:"NO_REPORT_FILE"}' > status/a4/emergency_latest.json
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main || true
+          git add status/a4/emergency_latest.json
+          git commit -m "A4 emergency status ${DATE_TW} run ${RUN_ID}" || true
+          git push origin main || true
+      - name: Enforce
+        if: always()
+        run: |
+          if [ "${{ steps.scraper.outcome }}" != "success" ]; then
+            exit 1
+          fi
