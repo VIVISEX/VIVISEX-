@@ -7,6 +7,7 @@ on:
     paths:
       - A4_001W_SustainedTransportAudit.py
       - .github/workflows/a4_001w_sustained_transport.yml
+      - status/a4/a4_001w_trigger.json
 
 permissions:
   contents: write
