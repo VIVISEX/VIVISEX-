@@ -3,7 +3,7 @@
   "status": "RECOVERY_REQUESTED",
   "date": "2026-08-19",
   "attempt": 2,
-  "requested_at": "2026-08-19T08:14:45+08:00",
-  "reason": "no_healthy_runner_0815",
+  "requested_at": "2026-08-19T08:18:30+08:00",
+  "reason": "refresh_live_runner_with_2026-08-18_broker_universe",
   "requested_by": "ChatGPT_A4_Watchdog"
 }
