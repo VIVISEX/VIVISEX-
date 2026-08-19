@@ -14,7 +14,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 TZ = ZoneInfo("Asia/Taipei")
-VERSION = "A4_001X_SUPERVISOR_V1.0.1"
+VERSION = "A4_001X_SUPERVISOR_V1.0.2"
 ROOT = Path(__file__).resolve().parent
 DEFAULT_SCRIPT = ROOT / "A4_001_TWSE_MIS盤前試撮抓取.py"
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", "output/mis"))
@@ -24,6 +24,7 @@ RESTART_CUTOFF = dtime.fromisoformat(os.getenv("SUPERVISOR_RESTART_CUTOFF", "09:
 MAX_RESTARTS = min(5, max(0, int(os.getenv("SUPERVISOR_MAX_RESTARTS", "2"))))
 HEARTBEAT_STALE_SECONDS = max(5.0, float(os.getenv("SUPERVISOR_HEARTBEAT_STALE_SECONDS", "18")))
 START_GRACE_SECONDS = max(5.0, float(os.getenv("SUPERVISOR_START_GRACE_SECONDS", "25")))
+LAUNCH_GRACE_SECONDS = max(3.0, float(os.getenv("SUPERVISOR_LAUNCH_GRACE_SECONDS", "10")))
 CHECK_SECONDS = min(5.0, max(0.25, float(os.getenv("SUPERVISOR_CHECK_SECONDS", "1"))))
 KILL_GRACE_SECONDS = min(10.0, max(1.0, float(os.getenv("SUPERVISOR_KILL_GRACE_SECONDS", "3"))))
 
@@ -106,14 +107,15 @@ def supervise(command: list[str], *, test_allow_early_success: bool = False) -> 
     reasons: list[str] = []
     current: subprocess.Popen[Any] | None = None
     final_rc: int | None = None
+    launched_at: datetime | None = None
 
     def launch(reason: str) -> None:
-        nonlocal current, launches
+        nonlocal current, launches, launched_at
         launches += 1
-        at = now_tw()
+        launched_at = now_tw()
         append_event(journal, {
             "version": VERSION,
-            "at": at.isoformat(),
+            "at": launched_at.isoformat(),
             "event": "LAUNCH",
             "launch": launches,
             "restart_count": restarts,
@@ -126,6 +128,7 @@ def supervise(command: list[str], *, test_allow_early_success: bool = False) -> 
 
     while True:
         assert current is not None
+        assert launched_at is not None
         now = now_tw()
         rc = current.poll()
 
@@ -155,7 +158,9 @@ def supervise(command: list[str], *, test_allow_early_success: bool = False) -> 
             final_rc = current.poll()
             break
 
-        if now >= start_at + timedelta(seconds=START_GRACE_SECONDS):
+        global_grace_done = now >= start_at + timedelta(seconds=START_GRACE_SECONDS)
+        launch_grace_done = now >= launched_at + timedelta(seconds=LAUNCH_GRACE_SECONDS)
+        if global_grace_done and launch_grace_done:
             age, hb_error = heartbeat_age(heartbeat, now)
             stale = hb_error is not None or age is None or age > HEARTBEAT_STALE_SECONDS
             if stale:
@@ -193,6 +198,7 @@ def supervise(command: list[str], *, test_allow_early_success: bool = False) -> 
         "restarts": restarts,
         "max_restarts": MAX_RESTARTS,
         "heartbeat_stale_seconds": HEARTBEAT_STALE_SECONDS,
+        "launch_grace_seconds": LAUNCH_GRACE_SECONDS,
         "final_returncode": final_rc,
         "recovery_reasons": reasons,
         "bounded_recovery": restarts <= MAX_RESTARTS,
@@ -225,8 +231,8 @@ def _write_test_worker(path: Path) -> None:
 
 
 def selftest() -> int:
-    global OUTPUT_DIR, START_TIME, END_TIME, RESTART_CUTOFF, MAX_RESTARTS, HEARTBEAT_STALE_SECONDS, START_GRACE_SECONDS, CHECK_SECONDS, KILL_GRACE_SECONDS
-    original = (OUTPUT_DIR, START_TIME, END_TIME, RESTART_CUTOFF, MAX_RESTARTS, HEARTBEAT_STALE_SECONDS, START_GRACE_SECONDS, CHECK_SECONDS, KILL_GRACE_SECONDS)
+    global OUTPUT_DIR, START_TIME, END_TIME, RESTART_CUTOFF, MAX_RESTARTS, HEARTBEAT_STALE_SECONDS, START_GRACE_SECONDS, LAUNCH_GRACE_SECONDS, CHECK_SECONDS, KILL_GRACE_SECONDS
+    original = (OUTPUT_DIR, START_TIME, END_TIME, RESTART_CUTOFF, MAX_RESTARTS, HEARTBEAT_STALE_SECONDS, START_GRACE_SECONDS, LAUNCH_GRACE_SECONDS, CHECK_SECONDS, KILL_GRACE_SECONDS)
     results: dict[str, Any] = {}
     try:
         with tempfile.TemporaryDirectory() as td:
@@ -239,7 +245,8 @@ def selftest() -> int:
             RESTART_CUTOFF = (now + timedelta(seconds=15)).time().replace(microsecond=0)
             MAX_RESTARTS = 2
             HEARTBEAT_STALE_SECONDS = 0.7
-            START_GRACE_SECONDS = 0.2
+            START_GRACE_SECONDS = 0.1
+            LAUNCH_GRACE_SECONDS = 0.45
             CHECK_SECONDS = 0.1
             KILL_GRACE_SECONDS = 0.5
 
@@ -260,10 +267,12 @@ def selftest() -> int:
             "bounded_failure": (not results["always_fail"]["pass"]) and results["always_fail"]["restarts"] == 2,
         }
         report = {"component": "A4_001X", "version": VERSION, "mode": "selftest", "checks": checks, "cases": results, "pass": all(checks.values())}
+        Path("status/a4").mkdir(parents=True, exist_ok=True)
+        Path("status/a4/a4_001x_supervisor_selftest.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
         print(json.dumps(report, ensure_ascii=False))
         return 0 if report["pass"] else 2
     finally:
-        OUTPUT_DIR, START_TIME, END_TIME, RESTART_CUTOFF, MAX_RESTARTS, HEARTBEAT_STALE_SECONDS, START_GRACE_SECONDS, CHECK_SECONDS, KILL_GRACE_SECONDS = original
+        OUTPUT_DIR, START_TIME, END_TIME, RESTART_CUTOFF, MAX_RESTARTS, HEARTBEAT_STALE_SECONDS, START_GRACE_SECONDS, LAUNCH_GRACE_SECONDS, CHECK_SECONDS, KILL_GRACE_SECONDS = original
 
 
 def main() -> int:
