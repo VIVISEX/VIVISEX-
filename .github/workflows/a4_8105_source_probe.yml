@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - .github/workflows/a4_8105_source_probe.yml
+      - status/a4/a4_8105_probe_trigger.json
 
 permissions:
   contents: write
@@ -99,7 +100,7 @@ jobs:
               'mixed_missing':[r.get('missing_symbols') for r in mixed],
               'conclusion':None,
           }
-          if report['alone_successes']==0 and all('8105' in (m or []) for m in report['alone_missing']):
+          if report['alone_successes']==0 and len(alone)==10 and all('8105' in (m or []) for m in report['alone_missing']):
               report['conclusion']='MIS_DOES_NOT_RETURN_8105_IN_CURRENT_PROBE'
           elif report['alone_successes']==len(alone)==10:
               report['conclusion']='8105_MIS_RETURN_STABLE'
