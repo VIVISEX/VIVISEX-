@@ -14,7 +14,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 TZ = ZoneInfo("Asia/Taipei")
-VERSION = "A4_001X_SUPERVISOR_V1.0.0"
+VERSION = "A4_001X_SUPERVISOR_V1.0.1"
 ROOT = Path(__file__).resolve().parent
 DEFAULT_SCRIPT = ROOT / "A4_001_TWSE_MIS盤前試撮抓取.py"
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", "output/mis"))
@@ -105,16 +105,15 @@ def supervise(command: list[str], *, test_allow_early_success: bool = False) -> 
     launches = 0
     reasons: list[str] = []
     current: subprocess.Popen[Any] | None = None
-    launched_at: datetime | None = None
     final_rc: int | None = None
 
     def launch(reason: str) -> None:
-        nonlocal current, launches, launched_at
+        nonlocal current, launches
         launches += 1
-        launched_at = now_tw()
+        at = now_tw()
         append_event(journal, {
             "version": VERSION,
-            "at": launched_at.isoformat(),
+            "at": at.isoformat(),
             "event": "LAUNCH",
             "launch": launches,
             "restart_count": restarts,
@@ -156,8 +155,7 @@ def supervise(command: list[str], *, test_allow_early_success: bool = False) -> 
             final_rc = current.poll()
             break
 
-        check_heartbeat = now >= start_at + timedelta(seconds=START_GRACE_SECONDS)
-        if check_heartbeat:
+        if now >= start_at + timedelta(seconds=START_GRACE_SECONDS):
             age, hb_error = heartbeat_age(heartbeat, now)
             stale = hb_error is not None or age is None or age > HEARTBEAT_STALE_SECONDS
             if stale:
@@ -206,24 +204,24 @@ def supervise(command: list[str], *, test_allow_early_success: bool = False) -> 
 
 
 def _write_test_worker(path: Path) -> None:
-    path.write_text(
-        """import json, os, sys, time\n"
-        "from datetime import datetime\n"
-        "from pathlib import Path\n"
-        "from zoneinfo import ZoneInfo\n"
-        "tz=ZoneInfo('Asia/Taipei')\n"
-        "out=Path(os.environ['OUTPUT_DIR']); out.mkdir(parents=True, exist_ok=True)\n"
-        "state=Path(os.environ['TEST_STATE']); n=int(state.read_text() if state.exists() else '0')+1; state.write_text(str(n))\n"
-        "mode=os.environ['TEST_BEHAVIOR']\n"
-        "hb=out/f\"heartbeat_{datetime.now(tz).strftime('%Y-%m-%d')}.json\"\n"
-        "def beat(): hb.write_text(json.dumps({'captured_at':datetime.now(tz).isoformat()}))\n"
-        "if mode=='crash_once' and n==1: sys.exit(7)\n"
-        "if mode=='hang_once' and n==1: beat(); time.sleep(3); sys.exit(0)\n"
-        "if mode=='always_fail': sys.exit(9)\n"
-        "for _ in range(6): beat(); time.sleep(0.12)\n"
-        "sys.exit(0)\n""",
-        encoding="utf-8",
-    )
+    lines = [
+        "import json, os, sys, time",
+        "from datetime import datetime",
+        "from pathlib import Path",
+        "from zoneinfo import ZoneInfo",
+        "tz=ZoneInfo('Asia/Taipei')",
+        "out=Path(os.environ['OUTPUT_DIR']); out.mkdir(parents=True, exist_ok=True)",
+        "state=Path(os.environ['TEST_STATE']); n=int(state.read_text() if state.exists() else '0')+1; state.write_text(str(n))",
+        "mode=os.environ['TEST_BEHAVIOR']",
+        "hb=out/f\"heartbeat_{datetime.now(tz).strftime('%Y-%m-%d')}.json\"",
+        "def beat(): hb.write_text(json.dumps({'captured_at':datetime.now(tz).isoformat()}))",
+        "if mode=='crash_once' and n==1: sys.exit(7)",
+        "if mode=='hang_once' and n==1: beat(); time.sleep(3); sys.exit(0)",
+        "if mode=='always_fail': sys.exit(9)",
+        "for _ in range(6): beat(); time.sleep(0.12)",
+        "sys.exit(0)",
+    ]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def selftest() -> int:
