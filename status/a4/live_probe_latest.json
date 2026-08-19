@@ -1,7 +1,7 @@
 {
   "mode": "env_test",
-  "started_at": "2026-08-19T08:48:40.294241+08:00",
-  "finished_at": "2026-08-19T08:48:41.504305+08:00",
+  "started_at": "2026-08-19T08:52:42.802921+08:00",
+  "finished_at": "2026-08-19T08:52:44.217350+08:00",
   "requested_symbols": 309,
   "normalized_rows": 309,
   "returned_symbols": 308,
@@ -21,7 +21,7 @@
     "batch"
   ],
   "pass": false,
-  "checked_at": "2026-08-19T08:48:41+08:00",
-  "run_id": "32202620998",
+  "checked_at": "2026-08-19T08:52:44+08:00",
+  "run_id": "32202872509",
   "workflow_outcome": "failure"
 }
