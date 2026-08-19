@@ -1,0 +1,52 @@
+name: QTS A4 MIS Raw Source Probe
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - A4_001V_MISRawSourceProbe.py
+      - .github/workflows/a4_001v_mis_raw_probe.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: qts-a4-mis-raw-probe
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install requests
+      - run: python A4_001V_MISRawSourceProbe.py
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: a4-mis-raw-probe-${{ github.run_id }}
+          path: output/mis_source_probe/
+          retention-days: 30
+      - name: Persist summary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f output/mis_source_probe/summary.json
+          cp output/mis_source_probe/summary.json /tmp/summary.json
+          git config user.name "qts-a4-bot"
+          git config user.email "qts-a4-bot@users.noreply.github.com"
+          git fetch origin main
+          git reset --hard origin/main
+          mkdir -p status/a4
+          cp /tmp/summary.json status/a4/a4_mis_raw_source_probe_latest.json
+          git add status/a4/a4_mis_raw_source_probe_latest.json
+          if ! git diff --cached --quiet; then
+            git commit -m "A4 MIS raw source probe ${{ github.run_id }}"
+            git push origin main
+          fi
