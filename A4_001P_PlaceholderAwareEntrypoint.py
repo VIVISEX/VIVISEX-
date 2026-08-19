@@ -9,7 +9,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parent
 CORE = ROOT / "A4_001_TWSE_MIS盤前試撮抓取.py"
-ADAPTER_VERSION = "A4_001P_PLACEHOLDER_V1.0.0"
+ADAPTER_VERSION = "A4_001P_PLACEHOLDER_V1.0.1"
 
 
 def load_core():
@@ -32,8 +32,8 @@ def install(mod: Any) -> Any:
         if not result.ok or not isinstance(result.raw, dict):
             return result
         items = result.items
-        # Positional repair is allowed only when TWSE returned exactly one element
-        # for every requested channel. This prevents guessing when a response is truncated.
+        # Safe only when TWSE returned exactly one element per requested channel.
+        # If counts differ, do not infer positions; normal Retry/Fail Closed handles it.
         if len(items) != len(batch):
             return result
         response_date = str((result.raw.get("queryTime") or {}).get("sysDate", "")).strip()
@@ -42,12 +42,17 @@ def install(mod: Any) -> Any:
             item = dict(raw_item) if isinstance(raw_item, dict) else {}
             code = str(item.get("c", "")).strip()
             if not code:
+                item["_qts_original_c"] = item.get("c")
+                item["_qts_original_d"] = item.get("d")
                 item["c"] = stock.code
                 item["_qts_placeholder"] = True
                 item["_qts_source_state"] = "NO_QUOTE_DATA"
                 item["_qts_requested_code"] = stock.code
                 item["_qts_requested_ex_ch"] = stock.ex_ch
                 item["_qts_response_date"] = response_date
+                if response_date and not str(item.get("d", "")).strip():
+                    item["d"] = response_date
+                    item["_qts_date_derived_from"] = "queryTime.sysDate"
             repaired.append(item)
         result.items = repaired
         return result
@@ -60,6 +65,7 @@ def install(mod: Any) -> Any:
         row["source"] = "TWSE_MIS"
         row["source_state"] = "NO_QUOTE_DATA" if placeholder else "QUOTE_DATA"
         row["signal_eligible"] = not placeholder
+        row["date_derived_from_query"] = bool(item.get("_qts_date_derived_from"))
         return row
 
     def placeholder_capture_cycle(stocks, cycle_deadline):
@@ -86,9 +92,6 @@ def install(mod: Any) -> Any:
 
 def selftest() -> int:
     mod = install(load_core())
-    original = mod.fetch_once
-    # Test the alignment algorithm in isolation by replacing the wrapped original
-    # through a tiny fake module instance is unnecessary; exercise the same invariants directly.
     batch = [mod.Stock("TSE", "8105", "tse_8105.tw"), mod.Stock("TSE", "2330", "tse_2330.tw")]
     raw = {
         "msgArray": [
@@ -98,18 +101,21 @@ def selftest() -> int:
         "queryTime": {"sysDate": "20260819"},
         "rtcode": "0000",
     }
-    # Reproduce the guarded alignment rule exactly for deterministic testing.
     items = []
     if len(raw["msgArray"]) == len(batch):
         for stock, raw_item in zip(batch, raw["msgArray"]):
             item = dict(raw_item)
             if not str(item.get("c", "")).strip():
+                item["_qts_original_c"] = item.get("c")
+                item["_qts_original_d"] = item.get("d")
                 item["c"] = stock.code
                 item["_qts_placeholder"] = True
                 item["_qts_source_state"] = "NO_QUOTE_DATA"
                 item["_qts_requested_code"] = stock.code
                 item["_qts_requested_ex_ch"] = stock.ex_ch
                 item["_qts_response_date"] = raw["queryTime"]["sysDate"]
+                item["d"] = raw["queryTime"]["sysDate"]
+                item["_qts_date_derived_from"] = "queryTime.sysDate"
             items.append(item)
     placeholder_row = mod.normalize_item(items[0], mod.now_tw(), "PREOPEN")
     real_row = mod.normalize_item(items[1], mod.now_tw(), "PREOPEN")
@@ -117,6 +123,7 @@ def selftest() -> int:
         "positional_alignment_guarded": len(raw["msgArray"]) == len(batch),
         "placeholder_code_restored": items[0]["c"] == "8105",
         "response_date_preserved": placeholder_row["market_date"] == "20260819",
+        "date_derivation_labeled": placeholder_row["date_derived_from_query"] is True,
         "placeholder_not_signal_eligible": placeholder_row["signal_eligible"] is False,
         "placeholder_state_explicit": placeholder_row["source_state"] == "NO_QUOTE_DATA",
         "real_quote_signal_eligible": real_row["signal_eligible"] is True,
