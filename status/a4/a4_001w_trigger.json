@@ -1,4 +1,4 @@
 {
-  "requested_at": "2026-08-20T00:50:20+08:00",
-  "reason": "fast_failed_batch_recovery_round3_60_cycles_real_5s_cadence"
+  "requested_at": "2026-08-20T00:56:30+08:00",
+  "reason": "persistent_session_round4_60_cycles_real_5s_cadence"
 }
