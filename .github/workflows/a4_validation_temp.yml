@@ -12,7 +12,7 @@ on:
       - A4_001_TWSE_MIS盤前試撮抓取.py
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   validate:
@@ -29,8 +29,11 @@ jobs:
       MAX_TOTAL_SYMBOLS: "3000"
       ENV_TEST_MIN_COVERAGE: "0.95"
       ENV_TEST_MAX_ERROR_RATE: "0.05"
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
@@ -41,8 +44,12 @@ jobs:
       - name: Compile
         run: python -m py_compile "A4_001A_CompleteControlPoint.py" "A4_001_TWSE_MIS盤前試撮抓取.py"
       - name: Integrated selftest
+        id: selftest
+        continue-on-error: true
         run: python "A4_001A_CompleteControlPoint.py" --mode selftest
       - name: Full-market environment probe
+        id: probe
+        continue-on-error: true
         run: python "A4_001A_CompleteControlPoint.py" --mode env_test
       - name: Show evidence
         if: always()
@@ -51,6 +58,44 @@ jobs:
           cat output/a4_validation/env_test_report.json 2>/dev/null || true
           echo '--- engine report ---'
           cat output/a4_validation/engine/env_test_report.json 2>/dev/null || true
+      - name: Persist validation evidence
+        if: always()
+        env:
+          SELFTEST_OUTCOME: ${{ steps.selftest.outcome }}
+          PROBE_OUTCOME: ${{ steps.probe.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p status/a4
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          src = Path('output/a4_validation/env_test_report.json')
+          if src.exists():
+              try:
+                  obj = json.loads(src.read_text(encoding='utf-8'))
+              except Exception as exc:
+                  obj = {'pass': False, 'error': f'VALIDATION_REPORT_PARSE_FAIL:{exc}'}
+          else:
+              obj = {'pass': False, 'error': 'VALIDATION_REPORT_MISSING'}
+          obj.update({
+              'validation_run_id': os.environ.get('GITHUB_RUN_ID'),
+              'validation_sha': os.environ.get('GITHUB_SHA'),
+              'validation_trigger_sha': os.environ.get('GITHUB_SHA'),
+              'selftest_outcome': os.environ.get('SELFTEST_OUTCOME'),
+              'probe_outcome': os.environ.get('PROBE_OUTCOME'),
+          })
+          Path('status/a4/validation_latest.json').write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding='utf-8')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin "$DEFAULT_BRANCH"
+          git rebase "origin/$DEFAULT_BRANCH"
+          git add status/a4/validation_latest.json
+          if ! git diff --cached --quiet; then
+            git commit -m "A4 validation evidence run ${GITHUB_RUN_ID}"
+            git push origin "$DEFAULT_BRANCH"
+          fi
       - name: Upload validation evidence
         if: always()
         uses: actions/upload-artifact@v7
@@ -59,3 +104,8 @@ jobs:
           path: output/a4_validation/
           if-no-files-found: warn
           retention-days: 7
+      - name: Enforce validation result
+        if: always()
+        run: |
+          if [ "${{ steps.selftest.outcome }}" != "success" ]; then exit 1; fi
+          if [ "${{ steps.probe.outcome }}" != "success" ]; then exit 1; fi
