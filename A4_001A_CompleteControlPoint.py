@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
+import importlib.util
+import io
 import base64
 import csv
 import hashlib
@@ -14,7 +17,7 @@ import sys
 import time
 from collections import Counter
 from dataclasses import asdict, dataclass
-from datetime import date, datetime, time as dtime
+from datetime import date, datetime, time as dtime, timezone
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
@@ -23,7 +26,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import requests
 
-VERSION = "A4_001A_COMPLETE_CONTROL_POINT_V2.1.0"
+VERSION = "A4_001A_COMPLETE_CONTROL_POINT_V2.3.0"
 COMPONENT = "A4_001A"
 TZ = ZoneInfo("Asia/Taipei")
 ENGINE = Path(__file__).resolve().parent / "A4_001_TWSE_MIS盤前試撮抓取.py"
@@ -34,7 +37,7 @@ TWSE_COMPANY = "https://openapi.twse.com.tw/v1/opendata/t187ap03_L"
 TPEX_COMPANY = "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap03_O"
 TWSE_HOLIDAY = "https://openapi.twse.com.tw/v1/holidaySchedule/holidaySchedule"
 DGPA = "https://www.dgpa.gov.tw/typh/daily/nds.html"
-UA = "Mozilla/5.0 QTS-A4-Complete-Control-Point/2.1"
+UA = "Mozilla/5.0 QTS-A4-Complete-Control-Point/2.3"
 START = dtime(8, 30)
 PREOPEN_END = dtime(9, 0)
 END = dtime(9, 30)
@@ -51,6 +54,8 @@ P05_MIN = float(os.getenv("MIN_P05_SYMBOL_COVERAGE", "0.95"))
 MAX_BAD_STREAK = int(os.getenv("MAX_CONSECUTIVE_INVALID_CYCLES", "2"))
 MAX_REQ_ERR = float(os.getenv("MAX_REQUEST_ERROR_RATE", "0.05"))
 MAX_GAP = float(os.getenv("MAX_ALLOWED_GAP_SECONDS", "30"))
+ENV_TEST_MIN_COVERAGE = float(os.getenv("ENV_TEST_MIN_COVERAGE", "0.95"))
+ENV_TEST_MAX_ERROR_RATE = float(os.getenv("ENV_TEST_MAX_ERROR_RATE", "0.05"))
 
 
 @dataclass(frozen=True)
@@ -203,8 +208,7 @@ def market_gate(day: date) -> dict[str, Any]:
         r = requests.get(DGPA, timeout=10, headers={"User-Agent": UA, "Cache-Control": "no-cache"})
         r.raise_for_status()
         r.encoding = r.apparent_encoding or r.encoding
-        p = Text()
-        p.feed(r.text)
+        p = Text(); p.feed(r.text)
         text = re.sub(r"\s+", " ", html.unescape(" ".join(p.parts)))
     except Exception as exc:
         raise RuntimeError(f"DGPA_SOURCE_GAP:{type(exc).__name__}:{exc}")
@@ -250,19 +254,94 @@ def engine_env(universe_path: Path) -> dict[str, str]:
 
 
 def run_engine(universe_path: Path, mode: str) -> tuple[int, str]:
+    """Run the MIS engine with API-level session warmup controlled here.
+
+    The old HTML warmup pages now return HTTP 404 while the production MIS API
+    remains healthy.  Session admission therefore probes the same getStockInfo
+    API used by production and requires both TSE and OTC representative symbols.
+    """
     env = engine_env(universe_path)
     env["RUN_MODE"] = mode
-    cp = subprocess.run([sys.executable, str(ENGINE)], env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    return cp.returncode, cp.stdout[-12000:]
+    if mode == "env_test":
+        env["MIN_SYMBOL_COVERAGE"] = str(ENV_TEST_MIN_COVERAGE)
+
+    managed = set(env)
+    previous = {k: os.environ.get(k) for k in managed}
+    os.environ.update(env)
+    module_name = f"qts_a4_engine_{os.getpid()}_{time.time_ns()}"
+    buf = io.StringIO()
+    try:
+        spec = importlib.util.spec_from_file_location(module_name, ENGINE)
+        if spec is None or spec.loader is None:
+            raise RuntimeError("ENGINE_IMPORT_SPEC_FAIL")
+        core = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = core
+        spec.loader.exec_module(core)
+
+        def validated_warm_session(session: requests.Session) -> dict[str, Any]:
+            errors: list[str] = []
+            probes = {"2330", "6488"}
+            for attempt in range(1, core.WARMUP_ATTEMPTS + 1):
+                try:
+                    response = session.get(
+                        core.MIS_URL,
+                        params={
+                            "ex_ch": "tse_2330.tw|otc_6488.tw",
+                            "json": "1",
+                            "delay": "0",
+                            "_": str(int(time.time() * 1000)),
+                        },
+                        timeout=core.WARMUP_TIMEOUT,
+                    )
+                    response.raise_for_status()
+                    obj = response.json()
+                    items = obj.get("msgArray", []) if isinstance(obj, dict) else []
+                    codes = {str(x.get("c", "")).strip() for x in items if isinstance(x, dict)}
+                    if str(obj.get("rtcode", "")) == "0000" and probes.issubset(codes):
+                        return {
+                            "ok": True,
+                            "attempt": attempt,
+                            "status": response.status_code,
+                            "url": core.MIS_URL,
+                            "cookie_count": len(session.cookies),
+                            "probe_symbols": sorted(probes),
+                            "returned_probe_symbols": sorted(codes & probes),
+                        }
+                    errors.append(
+                        f"MIS_API_SCHEMA rtcode={obj.get('rtcode') if isinstance(obj, dict) else None} "
+                        f"codes={sorted(codes & probes)}"
+                    )
+                except Exception as exc:
+                    et, _ = core.classify_exception(exc)
+                    errors.append(f"MIS_API:{et}:{exc}")
+                if attempt < core.WARMUP_ATTEMPTS:
+                    time.sleep(min(core.BACKOFF_CAP_SECONDS, core.BACKOFF_BASE_SECONDS * (2 ** (attempt - 1))))
+            return {
+                "ok": False,
+                "errors": errors[-6:],
+                "cookie_count": len(session.cookies),
+                "probe_symbols": sorted(probes),
+            }
+
+        core.warm_session = validated_warm_session
+        with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+            rc = int(core.main())
+        return rc, buf.getvalue()[-12000:]
+    except Exception as exc:
+        buf.write(f"\nCONTROL_ENGINE_FATAL:{type(exc).__name__}:{exc}\n")
+        return 99, buf.getvalue()[-12000:]
+    finally:
+        sys.modules.pop(module_name, None)
+        for key, old in previous.items():
+            if old is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = old
 
 
 def percentile(xs: list[float], q: float) -> float | None:
-    if not xs:
-        return None
-    ys = sorted(xs)
-    pos = (len(ys) - 1) * q
-    lo = math.floor(pos)
-    hi = math.ceil(pos)
+    if not xs: return None
+    ys = sorted(xs); pos = (len(ys) - 1) * q; lo = math.floor(pos); hi = math.ceil(pos)
     return ys[lo] if lo == hi else ys[lo] * (hi - pos) + ys[hi] * (pos - lo)
 
 
@@ -272,265 +351,226 @@ def audit_engine(stocks: list[Stock], day: str) -> dict[str, Any]:
     old = read_json(eng / f"report_{day}.json") or {}
     total = len(stocks)
     coverages: list[float] = []
-    pre_valid = 0
-    open_valid = 0
-    max_streak = 0
-    streak = 0
+    pre_valid = open_valid = 0
+    pre_total = open_total = 0
+    max_streak = streak = 0
     valid_times: list[datetime] = []
     if raw.exists():
         with raw.open("r", encoding="utf-8") as f:
             for line in f:
-                try:
-                    rec = json.loads(line)
-                except Exception:
-                    continue
-                phase = str(rec.get("phase", ""))
-                items = rec.get("items", []) or []
+                try: rec = json.loads(line)
+                except Exception: continue
+                phase = str(rec.get("phase", "")); items = rec.get("items", []) or []
                 fresh = {str(x.get("c", "")).strip() for x in items if isinstance(x, dict) and str(x.get("d", "")).strip() == day.replace("-", "") and str(x.get("c", "")).strip()}
-                cov = len(fresh) / total if total else 0.0
-                coverages.append(cov)
+                cov = len(fresh) / total if total else 0.0; coverages.append(cov)
                 good = cov >= PER_CYCLE
-                if phase == "PREOPEN":
-                    pre_valid += int(good)
-                elif phase == "OPEN_VALIDATION":
-                    open_valid += int(good)
+                if phase == "PREOPEN": pre_total += 1; pre_valid += int(good)
+                elif phase == "OPEN_VALIDATION": open_total += 1; open_valid += int(good)
                 if good:
                     streak = 0
-                    try:
-                        valid_times.append(datetime.fromisoformat(str(rec.get("captured_at"))))
-                    except Exception:
-                        pass
+                    try: valid_times.append(datetime.fromisoformat(str(rec.get("captured_at"))))
+                    except Exception: pass
                 else:
-                    streak += 1
-                    max_streak = max(max_streak, streak)
-    p05 = percentile(coverages, 0.05)
-    gap = max(((b - a).total_seconds() for a, b in zip(valid_times, valid_times[1:])), default=None)
+                    streak += 1; max_streak = max(max_streak, streak)
+    p05 = percentile(coverages, .05)
+    gap = max(((b-a).total_seconds() for a,b in zip(valid_times, valid_times[1:])), default=None)
     req_err = float(old.get("request_error_rate", 1.0))
-    expected = max(1, int(1800 / POLL))
-    pre_ratio = pre_valid / expected
-    open_ratio = open_valid / expected
+    pre_ratio = pre_valid / max(1, int(1800 / POLL))
+    open_ratio = open_valid / max(1, int(1800 / POLL))
     gates = {"raw_exists": raw.exists(), "p05_coverage": p05 is not None and p05 >= P05_MIN, "preopen_ratio": pre_ratio >= PRE_RATIO, "open_ratio": open_ratio >= OPEN_RATIO, "max_bad_streak": max_streak <= MAX_BAD_STREAK, "request_error_rate": req_err <= MAX_REQ_ERR, "max_gap": gap is not None and gap <= MAX_GAP}
     return {"pass": all(gates.values()), "gates": gates, "p05": p05, "preopen_ratio": pre_ratio, "open_ratio": open_ratio, "max_bad_streak": max_streak, "max_gap_seconds": gap, "request_error_rate": req_err, "engine_report": old}
 
 
 def build_clean(stocks: list[Stock], day: str, run_id: str) -> dict[str, Any]:
     src = OUT / "engine" / f"normalized_{day}.csv"
-    if not src.exists():
-        return {"pass": False, "reason": "NO_ENGINE_CSV"}
+    if not src.exists(): return {"pass": False, "reason": "NO_ENGINE_CSV"}
     df = pd.read_csv(src, dtype={"code": str, "market_date": str})
-    allowed = {s.code for s in stocks}
-    compact = day.replace("-", "")
+    allowed = {s.code for s in stocks}; compact = day.replace("-", "")
     before = len(df)
     df = df[df["code"].astype(str).isin(allowed) & (df["market_date"].astype(str) == compact)].copy()
-    if {"captured_at", "code"}.issubset(df.columns):
-        df = df.drop_duplicates(subset=["captured_at", "code"], keep="last")
-    csv_path = OUT / f"clean_{day}_{run_id}.csv"
-    pq_path = OUT / f"clean_{day}_{run_id}.parquet"
-    df.to_csv(csv_path, index=False, encoding="utf-8-sig")
-    df.to_parquet(pq_path, index=False)
-    return {"pass": len(df) > 0, "rows_before": before, "rows_after": len(df), "rejected": before - len(df), "csv": str(csv_path), "parquet": str(pq_path)}
+    if {"captured_at", "code"}.issubset(df.columns): df = df.drop_duplicates(subset=["captured_at", "code"], keep="last")
+    csv_path = OUT / f"clean_{day}_{run_id}.csv"; pq_path = OUT / f"clean_{day}_{run_id}.parquet"
+    df.to_csv(csv_path, index=False, encoding="utf-8-sig"); df.to_parquet(pq_path, index=False)
+    return {"pass": len(df) > 0, "rows_before": before, "rows_after": len(df), "rejected": before-len(df), "csv": str(csv_path), "parquet": str(pq_path)}
 
 
 def write_status(report: dict[str, Any]) -> None:
-    STATUS.mkdir(parents=True, exist_ok=True)
-    day = str(report["date"])
-    rid = os.getenv("GITHUB_RUN_ID", "local")
+    STATUS.mkdir(parents=True, exist_ok=True); day = str(report["date"]); rid = os.getenv("GITHUB_RUN_ID", "local")
     x = {**report, "component": COMPONENT, "version": VERSION, "run_id": rid, "run_attempt": os.getenv("GITHUB_RUN_ATTEMPT", "1"), "event_name": os.getenv("GITHUB_EVENT_NAME", "local"), "source_commit": os.getenv("GITHUB_SHA", "local"), "checked_at": iso()}
-    atomic_json(STATUS / "latest.json", x)
-    atomic_json(STATUS / f"{day}_{rid}.json", x)
-    if x.get("pass") and x.get("production_acceptance_applicable", True):
-        atomic_json(STATUS / f"{day}_COMPLETED.json", x)
+    atomic_json(STATUS / "latest.json", x); atomic_json(STATUS / f"{day}_{rid}.json", x)
+    if x.get("pass") and x.get("production_acceptance_applicable", True): atomic_json(STATUS / f"{day}_COMPLETED.json", x)
 
 
 def selftest() -> int:
-    a, ar = normalize_companies([{"公司代號": "2330", "公司簡稱": "台積電"}, {"公司代號": "0050", "公司簡稱": "ETF"}, {"公司代號": "9105", "公司簡稱": "TDR"}, {"公司代號": "2330", "公司簡稱": "台積電"}], "TSE")
-    b, br = normalize_companies([{"SecuritiesCompanyCode": "6488", "CompanyAbbreviation": "環球晶"}], "OTC")
+    a, ar = normalize_companies([{"公司代號":"2330","公司簡稱":"台積電"},{"公司代號":"0050","公司簡稱":"ETF"},{"公司代號":"9105","公司簡稱":"TDR"},{"公司代號":"2330","公司簡稱":"台積電"}], "TSE")
+    b, br = normalize_companies([{"SecuritiesCompanyCode":"6488","CompanyAbbreviation":"環球晶"}], "OTC")
     checks = {"preflight": preflight("selftest")["status"] == "PASS", "twse": [x.code for x in a] == ["2330"], "tpex": [x.code for x in b] == ["6488"], "non_equity_filter": ar["rejected"].get("NON_ORDINARY_CODE") == 2, "duplicate": ar["duplicates"] == 1}
-    rep = {"component": COMPONENT, "version": VERSION, "mode": "selftest", "pass": all(checks.values()), "checks": checks, "twse": ar, "tpex": br, "checked_at": iso()}
-    atomic_json(OUT / "selftest_report.json", rep)
-    print(json.dumps(rep, ensure_ascii=False))
-    return 0 if rep["pass"] else 2
+    rep = {"component": COMPONENT,"version":VERSION,"mode":"selftest","pass":all(checks.values()),"checks":checks,"twse":ar,"tpex":br,"checked_at":iso()}; atomic_json(OUT/"selftest_report.json",rep); print(json.dumps(rep,ensure_ascii=False)); return 0 if rep["pass"] else 2
 
 
 def env_test() -> int:
     pf = preflight("env_test")
     stocks, urep = universe()
     up = write_universe(stocks, urep, now().date().isoformat())
+    gate_probe = market_gate(now().date())
     rc, log = run_engine(up, "env_test")
     eng = read_json(OUT / "engine" / "env_test_report.json") or {}
-    rep = {"component": COMPONENT, "version": VERSION, "mode": "env_test", "pass": pf["status"] == "PASS" and urep["status"] == "READY" and bool(eng.get("pass")), "preflight": pf, "universe": urep, "engine_returncode": rc, "engine": eng, "engine_log_tail": log[-3000:], "checked_at": iso()}
+
+    requested = int(eng.get("requested_symbols") or 0)
+    returned = int(eng.get("returned_symbols") or 0)
+    attempts = int(eng.get("request_attempts") or 0)
+    errors = int(eng.get("request_errors") or 0)
+    coverage = (returned / requested) if requested else 0.0
+    error_rate = (errors / attempts) if attempts else 1.0
+    elapsed = float(eng.get("cycle_elapsed_seconds") or 999999.0)
+    budget = float(eng.get("cycle_budget_seconds") or 0.0)
+    warmup_ok = int(eng.get("warmup_ok_count") or 0)
+    warmup_total = int(eng.get("warmup_total") or 0)
+
+    gates = {
+        "preflight": pf["status"] == "PASS",
+        "universe_ready": urep["status"] == "READY",
+        "market_gate_source_verified": bool(gate_probe.get("verified")),
+        "universe_matches_engine_request": requested == len(stocks),
+        "full_market_coverage": coverage >= ENV_TEST_MIN_COVERAGE,
+        "request_error_rate": error_rate <= ENV_TEST_MAX_ERROR_RATE,
+        "cycle_budget": budget > 0 and elapsed <= budget + 0.25,
+        "warmup_available": warmup_total > 0 and warmup_ok > 0,
+        "engine_process_clean_exit": rc == 0,
+    }
+    rep = {
+        "component": COMPONENT,
+        "version": VERSION,
+        "mode": "env_test",
+        "pass": all(gates.values()),
+        "gates": gates,
+        "preflight": pf,
+        "universe": urep,
+        "market_gate_probe": gate_probe,
+        "requested_symbols": requested,
+        "returned_symbols": returned,
+        "coverage": coverage,
+        "required_coverage": ENV_TEST_MIN_COVERAGE,
+        "request_attempts": attempts,
+        "request_errors": errors,
+        "request_error_rate": error_rate,
+        "allowed_request_error_rate": ENV_TEST_MAX_ERROR_RATE,
+        "cycle_elapsed_seconds": elapsed,
+        "cycle_budget_seconds": budget,
+        "warmup_ok_count": warmup_ok,
+        "warmup_total": warmup_total,
+        "engine_returncode": rc,
+        "engine": eng,
+        "engine_log_tail": log[-3000:],
+        "checked_at": iso(),
+    }
     atomic_json(OUT / "env_test_report.json", rep)
     print(json.dumps(rep, ensure_ascii=False))
     return 0 if rep["pass"] else 3
 
 
 def live() -> int:
-    start = now()
-    day = start.date().isoformat()
-    rid = os.getenv("GITHUB_RUN_ID", f"local-{start:%H%M%S}")
-    if read_json(STATUS / f"{day}_COMPLETED.json"):
-        return 0
-    pf = preflight("live")
-    if pf["status"] != "PASS":
-        raise RuntimeError("PREFLIGHT_FAIL")
-    checkpoint("PREFLIGHT", preflight=pf)
-    stocks, urep = universe()
-    up = write_universe(stocks, urep, day)
-    checkpoint("SOURCE_READY", universe_hash=urep["hash"], universe_count=len(stocks))
-    while now() < at(FINAL_GATE):
-        time.sleep(min(1, max(0.05, (at(FINAL_GATE) - now()).total_seconds())))
-    gate = market_gate(start.date())
-    atomic_json(OUT / f"market_gate_{day}.json", gate)
+    start=now(); day=start.date().isoformat(); rid=os.getenv("GITHUB_RUN_ID",f"local-{start:%H%M%S}")
+    if read_json(STATUS/f"{day}_COMPLETED.json"): return 0
+    pf=preflight("live");
+    if pf["status"]!="PASS": raise RuntimeError("PREFLIGHT_FAIL")
+    checkpoint("PREFLIGHT",preflight=pf)
+    stocks,urep=universe(); up=write_universe(stocks,urep,day); checkpoint("SOURCE_READY",universe_hash=urep["hash"],universe_count=len(stocks))
+    while now()<at(FINAL_GATE): time.sleep(min(1,max(.05,(at(FINAL_GATE)-now()).total_seconds())))
+    gate=market_gate(start.date()); atomic_json(OUT/f"market_gate_{day}.json",gate)
     if not gate["should_run"]:
-        rep = {"date": day, "mode": "live", "pass": True, "production_acceptance_applicable": False, "result": "MARKET_CLOSED", "preflight": pf, "universe": urep, "market_gate": gate}
-        write_status(rep)
-        return 0
-    checkpoint("EXECUTING", market_gate=gate)
-    rc, log = run_engine(up, "live")
-    checkpoint("ACCEPTANCE", engine_returncode=rc)
-    audit = audit_engine(stocks, day)
-    clean = build_clean(stocks, day, rid)
-    passed = bool(audit["pass"] and clean["pass"])
-    rep = {"date": day, "mode": "live", "pass": passed, "production_acceptance_applicable": True, "preflight": pf, "universe": urep, "market_gate": gate, "engine_returncode": rc, "engine_log_tail": log[-4000:], "audit": audit, "clean": clean, "checkpoint": str(CHECKPOINT), "legacy_fixed_stocks_csv_used": False, "failure_reasons": [k.upper() for k, v in audit["gates"].items() if not v] + ([] if clean["pass"] else ["CLEAN_FAIL"])}
-    checkpoint("AUDIT", pass_result=passed)
-    write_status(rep)
-    atomic_json(OUT / f"report_{day}.json", rep)
-    print(json.dumps(rep, ensure_ascii=False))
-    return 0 if passed else 4
+        rep={"date":day,"mode":"live","pass":True,"production_acceptance_applicable":False,"result":"MARKET_CLOSED","preflight":pf,"universe":urep,"market_gate":gate}; write_status(rep); return 0
+    checkpoint("EXECUTING",market_gate=gate)
+    rc,log=run_engine(up,"live"); checkpoint("ACCEPTANCE",engine_returncode=rc)
+    audit=audit_engine(stocks,day); clean=build_clean(stocks,day,rid)
+    engine_clean_exit = rc == 0
+    passed=bool(engine_clean_exit and audit["pass"] and clean["pass"])
+    failure_reasons=[k.upper() for k,v in audit["gates"].items() if not v]+([] if clean["pass"] else ["CLEAN_FAIL"])+([] if engine_clean_exit else ["ENGINE_NONZERO_EXIT"])
+    rep={"date":day,"mode":"live","pass":passed,"production_acceptance_applicable":True,"preflight":pf,"universe":urep,"market_gate":gate,"engine_returncode":rc,"engine_clean_exit":engine_clean_exit,"engine_log_tail":log[-4000:],"audit":audit,"clean":clean,"checkpoint":str(CHECKPOINT),"legacy_fixed_stocks_csv_used":False,"failure_reasons":failure_reasons}
+    checkpoint("AUDIT",pass_result=passed); write_status(rep); atomic_json(OUT/f"report_{day}.json",rep); print(json.dumps(rep,ensure_ascii=False)); return 0 if passed else 4
 
 
-def gh_headers() -> dict[str, str]:
-    token = os.getenv("GITHUB_TOKEN", "").strip()
-    if not token:
-        raise RuntimeError("GITHUB_TOKEN_MISSING")
-    return {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": UA}
+def gh_headers() -> dict[str,str]:
+    token=os.getenv("GITHUB_TOKEN","").strip()
+    if not token: raise RuntimeError("GITHUB_TOKEN_MISSING")
+    return {"Authorization":f"Bearer {token}","Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28","User-Agent":UA}
 
 
-def gh_content(repo: str, path: str) -> tuple[dict[str, Any] | None, str | None]:
-    r = requests.get(f"https://api.github.com/repos/{repo}/contents/{path}", headers=gh_headers(), timeout=15)
-    if r.status_code == 404:
-        return None, None
-    r.raise_for_status()
-    p = r.json()
-    obj = json.loads(base64.b64decode(p["content"]).decode())
-    return (obj if isinstance(obj, dict) else None), p.get("sha")
+def gh_content(repo:str,path:str)->tuple[dict[str,Any]|None,str|None]:
+    r=requests.get(f"https://api.github.com/repos/{repo}/contents/{path}",headers=gh_headers(),timeout=15)
+    if r.status_code==404:return None,None
+    r.raise_for_status(); p=r.json(); obj=json.loads(base64.b64decode(p["content"]).decode()); return (obj if isinstance(obj,dict) else None),p.get("sha")
 
 
-def gh_put(repo: str, path: str, obj: dict[str, Any], msg: str) -> None:
+def gh_put(repo:str,path:str,obj:dict[str,Any],msg:str)->None:
     for i in range(3):
-        _, sha = gh_content(repo, path)
-        body = {"message": msg, "content": base64.b64encode(json.dumps(obj, ensure_ascii=False, indent=2).encode()).decode(), "branch": os.getenv("DEFAULT_BRANCH", "main")}
-        if sha:
-            body["sha"] = sha
-        r = requests.put(f"https://api.github.com/repos/{repo}/contents/{path}", headers=gh_headers(), json=body, timeout=15)
-        if r.status_code in (200, 201):
-            return
-        if r.status_code in (409, 422) and i < 2:
-            time.sleep(i + 1)
-            continue
+        _,sha=gh_content(repo,path); body={"message":msg,"content":base64.b64encode(json.dumps(obj,ensure_ascii=False,indent=2).encode()).decode(),"branch":os.getenv("DEFAULT_BRANCH","main")}
+        if sha: body["sha"]=sha
+        r=requests.put(f"https://api.github.com/repos/{repo}/contents/{path}",headers=gh_headers(),json=body,timeout=15)
+        if r.status_code in (200,201): return
+        if r.status_code in (409,422) and i<2: time.sleep(i+1); continue
         raise RuntimeError(f"GITHUB_WRITE_{r.status_code}:{r.text[:400]}")
 
 
-def parse_dt(x: Any) -> datetime | None:
-    try:
-        return datetime.fromisoformat(str(x).replace("Z", "+00:00")).astimezone(TZ) if x else None
-    except Exception:
-        return None
+def parse_dt(x:Any)->datetime|None:
+    try:return datetime.fromisoformat(str(x).replace("Z","+00:00")).astimezone(TZ) if x else None
+    except Exception:return None
 
 
-def run_state(repo: str, workflow: str, day: date) -> dict[str, Any]:
-    r = requests.get(f"https://api.github.com/repos/{repo}/actions/workflows/{workflow}/runs?per_page=100", headers=gh_headers(), timeout=15)
-    r.raise_for_status()
-    obs = []
-    current = str(os.getenv("GITHUB_RUN_ID", ""))
-    for run in r.json().get("workflow_runs", []):
-        rid = str(run.get("id", ""))
-        created = parse_dt(run.get("created_at"))
-        if not rid or rid == current or not created or created.date() != day:
-            continue
-        j = requests.get(f"https://api.github.com/repos/{repo}/actions/runs/{rid}/jobs?per_page=100", headers=gh_headers(), timeout=15)
-        j.raise_for_status()
-        for job in j.json().get("jobs", []):
-            if str(job.get("name")) != "production":
-                continue
-            obs.append({"run_id": int(rid), "job_id": job.get("id"), "status": job.get("status"), "conclusion": job.get("conclusion"), "started_at": job.get("started_at"), "event": run.get("event")})
-    return {"observations": obs, "healthy": [x for x in obs if x["status"] == "in_progress" and x["started_at"]], "queued": [x for x in obs if x["status"] in {"queued", "waiting", "pending", "requested"} and not x["started_at"]], "failures": [x for x in obs if x["status"] == "completed" and x["conclusion"] not in {None, "success"}], "successes": [x for x in obs if x["status"] == "completed" and x["conclusion"] == "success"]}
+def run_state(repo:str,workflow:str,day:date)->dict[str,Any]:
+    r=requests.get(f"https://api.github.com/repos/{repo}/actions/workflows/{workflow}/runs?per_page=100",headers=gh_headers(),timeout=15); r.raise_for_status(); obs=[]; current=str(os.getenv("GITHUB_RUN_ID",""))
+    for run in r.json().get("workflow_runs",[]):
+        rid=str(run.get("id","")); created=parse_dt(run.get("created_at"))
+        if not rid or rid==current or not created or created.date()!=day: continue
+        j=requests.get(f"https://api.github.com/repos/{repo}/actions/runs/{rid}/jobs?per_page=100",headers=gh_headers(),timeout=15); j.raise_for_status()
+        for job in j.json().get("jobs",[]):
+            if str(job.get("name"))!="production": continue
+            obs.append({"run_id":int(rid),"job_id":job.get("id"),"status":job.get("status"),"conclusion":job.get("conclusion"),"started_at":job.get("started_at"),"event":run.get("event")})
+    return {"observations":obs,"healthy":[x for x in obs if x["status"]=="in_progress" and x["started_at"]],"queued":[x for x in obs if x["status"] in {"queued","waiting","pending","requested"} and not x["started_at"]],"failures":[x for x in obs if x["status"]=="completed" and x["conclusion"] not in {None,"success"}],"successes":[x for x in obs if x["status"]=="completed" and x["conclusion"]=="success"]}
 
 
-def dispatch(repo: str, workflow: str) -> None:
-    body = {"ref": os.getenv("DEFAULT_BRANCH", "main"), "inputs": {"run_mode": "live_recovery"}}
-    r = requests.post(f"https://api.github.com/repos/{repo}/actions/workflows/{workflow}/dispatches", headers=gh_headers(), json=body, timeout=15)
-    if r.status_code not in (200, 204):
-        raise RuntimeError(f"DISPATCH_{r.status_code}:{r.text[:400]}")
+def dispatch(repo:str,workflow:str)->None:
+    body={"ref":os.getenv("DEFAULT_BRANCH","main"),"inputs":{"run_mode":"live_recovery"}}; r=requests.post(f"https://api.github.com/repos/{repo}/actions/workflows/{workflow}/dispatches",headers=gh_headers(),json=body,timeout=15)
+    if r.status_code not in (200,204): raise RuntimeError(f"DISPATCH_{r.status_code}:{r.text[:400]}")
 
 
-def watchdog(stage: str) -> int:
-    repo = os.getenv("GITHUB_REPOSITORY", "").strip()
-    workflow = os.getenv("A4_WORKFLOW_FILE", "scraper.yml")
-    day = now().date()
-    ds = day.isoformat()
-    if not repo:
-        raise RuntimeError("GITHUB_REPOSITORY_MISSING")
-    completed, _ = gh_content(repo, f"status/a4/{ds}_COMPLETED.json")
-    if completed and completed.get("pass"):
-        status = "HEALTHY_NOOP"; reason = "COMPLETED_EXISTS"; state = {}; recover = False
+def watchdog(stage:str)->int:
+    repo=os.getenv("GITHUB_REPOSITORY","").strip(); workflow=os.getenv("A4_WORKFLOW_FILE","scraper.yml"); day=now().date(); ds=day.isoformat()
+    if not repo: raise RuntimeError("GITHUB_REPOSITORY_MISSING")
+    completed,_=gh_content(repo,f"status/a4/{ds}_COMPLETED.json")
+    if completed and completed.get("pass"): status="HEALTHY_NOOP"; reason="COMPLETED_EXISTS"; state={}; recover=False
     else:
-        state = run_state(repo, workflow, day)
-        if state["healthy"]:
-            status = "HEALTHY_NOOP"; reason = "PRODUCTION_IN_PROGRESS"; recover = False
-        elif state["queued"]:
-            status = "A4_RUNNER_QUEUE_RISK"; reason = "PRODUCTION_QUEUED_DO_NOT_CANCEL"; recover = False
-        elif state["successes"]:
-            status = "HEALTHY_NOOP"; reason = "SUCCESS_AWAITING_COMPLETED"; recover = False
-        else:
-            status = "RECOVERY_REQUIRED"; reason = "NO_HEALTHY_PRODUCTION" if not state["observations"] else "PRODUCTION_FAILED"; recover = True
-    desired = 1 if stage == "first" else 2
-    dispatched = False
-    trigger = None
+        state=run_state(repo,workflow,day)
+        if state["healthy"]: status="HEALTHY_NOOP"; reason="PRODUCTION_IN_PROGRESS"; recover=False
+        elif state["queued"]: status="A4_RUNNER_QUEUE_RISK"; reason="PRODUCTION_QUEUED_DO_NOT_CANCEL"; recover=False
+        elif state["successes"]: status="HEALTHY_NOOP"; reason="SUCCESS_AWAITING_COMPLETED"; recover=False
+        else: status="RECOVERY_REQUIRED"; reason="NO_HEALTHY_PRODUCTION" if not state["observations"] else "PRODUCTION_FAILED"; recover=True
+    desired=1 if stage=="first" else 2; dispatched=False; trigger=None
     if recover:
-        old, _ = gh_content(repo, "status/a4/recovery_trigger.json")
-        old_attempt = int(old.get("attempt", 0)) if old and old.get("date") == ds else 0
-        if old_attempt < desired:
-            trigger = {"component": COMPONENT, "status": "RECOVERY_REQUESTED", "date": ds, "attempt": desired, "requested_at": iso(), "reason": "no_healthy_runner_0815" if stage == "first" else "no_healthy_runner_0829", "requested_by": "QTS_A4_COMPLETE_CONTROL_POINT"}
-            gh_put(repo, "status/a4/recovery_trigger.json", trigger, f"A4 recovery {ds} attempt {desired}")
-            dispatch(repo, workflow)
-            dispatched = True
-        else:
-            status = "RECOVERY_ALREADY_REQUESTED"; reason = f"ATTEMPT_ALREADY_{old_attempt}"
-    decision = {"component": COMPONENT, "version": VERSION, "mode": "watchdog", "stage": stage, "date": ds, "status": status, "reason": reason, "desired_attempt": desired, "recovery_dispatched": dispatched, "trigger": trigger, "state": state, "checked_at": iso()}
-    gh_put(repo, "status/a4/watchdog_latest.json", decision, f"A4 watchdog {ds} {stage} {status}")
-    atomic_json(OUT / "watchdog_latest.json", decision)
-    print(json.dumps(decision, ensure_ascii=False))
-    return 0
+        old,_=gh_content(repo,"status/a4/recovery_trigger.json"); old_attempt=int(old.get("attempt",0)) if old and old.get("date")==ds else 0
+        if old_attempt<desired:
+            trigger={"component":COMPONENT,"status":"RECOVERY_REQUESTED","date":ds,"attempt":desired,"requested_at":iso(),"reason":"no_healthy_runner_0815" if stage=="first" else "no_healthy_runner_0829","requested_by":"QTS_A4_COMPLETE_CONTROL_POINT"}; gh_put(repo,"status/a4/recovery_trigger.json",trigger,f"A4 recovery {ds} attempt {desired}"); dispatch(repo,workflow); dispatched=True
+        else: status="RECOVERY_ALREADY_REQUESTED"; reason=f"ATTEMPT_ALREADY_{old_attempt}"
+    decision={"component":COMPONENT,"version":VERSION,"mode":"watchdog","stage":stage,"date":ds,"status":status,"reason":reason,"desired_attempt":desired,"recovery_dispatched":dispatched,"trigger":trigger,"state":state,"checked_at":iso()}; gh_put(repo,"status/a4/watchdog_latest.json",decision,f"A4 watchdog {ds} {stage} {status}"); atomic_json(OUT/"watchdog_latest.json",decision); print(json.dumps(decision,ensure_ascii=False)); return 0
 
 
-def fatal(mode: str, exc: Exception) -> None:
-    rep = {"component": COMPONENT, "version": VERSION, "date": now().date().isoformat(), "mode": mode, "pass": False, "failure_reasons": ["FAIL_CLOSED"], "error": f"{type(exc).__name__}: {exc}", "checked_at": iso()}
-    atomic_json(OUT / "fatal_error.json", rep)
-    if mode == "live":
-        try:
-            write_status(rep)
-        except Exception:
-            pass
+def fatal(mode:str,exc:Exception)->None:
+    rep={"component":COMPONENT,"version":VERSION,"date":now().date().isoformat(),"mode":mode,"pass":False,"failure_reasons":["FAIL_CLOSED"],"error":f"{type(exc).__name__}: {exc}","checked_at":iso()}; atomic_json(OUT/"fatal_error.json",rep)
+    if mode=="live":
+        try: write_status(rep)
+        except Exception: pass
 
 
-def main() -> int:
-    p = argparse.ArgumentParser()
-    p.add_argument("--mode", required=True, choices=["selftest", "env_test", "live", "watchdog"])
-    p.add_argument("--watchdog-stage", choices=["first", "final"], default="first")
-    a = p.parse_args()
-    return selftest() if a.mode == "selftest" else env_test() if a.mode == "env_test" else watchdog(a.watchdog_stage) if a.mode == "watchdog" else live()
+def main()->int:
+    p=argparse.ArgumentParser(); p.add_argument("--mode",required=True,choices=["selftest","env_test","live","watchdog"]); p.add_argument("--watchdog-stage",choices=["first","final"],default="first"); a=p.parse_args()
+    return selftest() if a.mode=="selftest" else env_test() if a.mode=="env_test" else watchdog(a.watchdog_stage) if a.mode=="watchdog" else live()
 
 
-if __name__ == "__main__":
-    mode = "unknown"
+if __name__=="__main__":
+    mode="unknown"
     try:
-        if "--mode" in sys.argv:
-            mode = sys.argv[sys.argv.index("--mode") + 1]
+        if "--mode" in sys.argv: mode=sys.argv[sys.argv.index("--mode")+1]
         raise SystemExit(main())
-    except KeyboardInterrupt:
-        raise
+    except KeyboardInterrupt: raise
     except Exception as exc:
-        fatal(mode, exc)
-        print(json.dumps({"component": COMPONENT, "version": VERSION, "mode": mode, "result": "FAIL_CLOSED", "error": f"{type(exc).__name__}: {exc}"}, ensure_ascii=False), file=sys.stderr)
-        raise SystemExit(99)
+        fatal(mode,exc); print(json.dumps({"component":COMPONENT,"version":VERSION,"mode":mode,"result":"FAIL_CLOSED","error":f"{type(exc).__name__}: {exc}"},ensure_ascii=False),file=sys.stderr); raise SystemExit(99)
