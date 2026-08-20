@@ -1,76 +1,57 @@
-name: QTS A4 TWSE MIS preopen scraper
-run-name: A4 MIS ${{ (github.event_name == 'schedule' || github.event_name == 'push') && 'LIVE' || format('MANUAL-{0}', inputs.run_mode) }} | ${{ github.run_id }}
+name: QTS A4 Complete Control Point
+run-name: A4 CCP | ${{ github.event_name }} | ${{ github.run_id }}
 
 on:
   workflow_dispatch:
     inputs:
       run_mode:
-        description: Run mode
+        description: A4 control mode
         required: true
         default: env_test
         type: choice
         options:
+          - selftest
           - env_test
           - live
+          - live_recovery
   schedule:
-    # Asia/Taipei Monday-Friday redundant primary clocks.
-    - cron: "30 23 * * 0-4"
-    - cron: "45 23 * * 0-4"
+    # Asia/Taipei Monday-Friday: one 08:00 production trigger and one 08:15 watchdog trigger.
+    # The watchdog stays alive and performs its final recheck at 08:29 in the same job.
     - cron: "0 0 * * 1-5"
-    - cron: "10 0 * * 1-5"
-    - cron: "20 0 * * 1-5"
-    - cron: "25 0 * * 1-5"
-    - cron: "27 0 * * 1-5"
-  push:
-    branches:
-      - main
-    paths:
-      - status/a4/recovery_trigger.json
+    - cron: "15 0 * * 1-5"
 
 permissions:
   contents: write
-
-concurrency:
-  group: ${{ (github.event_name == 'schedule' || github.event_name == 'push' || inputs.run_mode == 'live') && 'qts-a4-mis-production' || format('qts-a4-mis-test-{0}', github.run_id) }}
-  cancel-in-progress: false
+  actions: write
 
 jobs:
-  scrape:
+  production:
+    name: production
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule == '0 0 * * 1-5') ||
+      (github.event_name == 'workflow_dispatch' && (inputs.run_mode == 'live' || inputs.run_mode == 'live_recovery'))
     runs-on: ubuntu-latest
     timeout-minutes: 150
-
+    concurrency:
+      group: qts-a4-mis-production
+      cancel-in-progress: false
+      queue: max
     env:
       TZ: Asia/Taipei
-      STOCKS_FILE: stocks.csv
-      OUTPUT_DIR: output/mis
-      POLL_SECONDS: "5"
-      START_TIME: "08:30:00"
-      PREOPEN_END: "09:00:00"
-      END_TIME: "09:30:00"
-      BATCH_SIZE: "60"
-      PRIMARY_WORKERS: "3"
-      RETRY_BATCH_SIZE: "30"
-      RETRY_WORKERS: "2"
-      SINGLE_FALLBACK_LIMIT: "4"
-      SESSION_POOL_SIZE: "3"
-      PRIMARY_TIMEOUT: "2.20"
-      RETRY_TIMEOUT: "1.80"
-      SINGLE_TIMEOUT: "1.40"
-      CYCLE_BUDGET_SECONDS: "4.60"
-      CYCLE_GUARD_SECONDS: "0.15"
-      WARMUP_TIMEOUT: "3.0"
-      WARMUP_ATTEMPTS: "3"
-      SOURCE_GAP_CONSECUTIVE_CYCLES: "3"
-      MAX_REQUEST_ERROR_RATE: "0.02"
-      MIN_PREOPEN_COVERAGE: "0.98"
-      MIN_OPEN_COVERAGE: "0.95"
-      MIN_SYMBOL_COVERAGE: "0.99"
-      MAX_ALLOWED_GAP_SECONDS: "15"
-      RETRY_TRIGGER_COVERAGE: "0.80"
-      BACKOFF_BASE_SECONDS: "0.75"
-      BACKOFF_CAP_SECONDS: "3.0"
-      A4_MARKET_GATE_TIMEOUT: "5"
-      RUN_MODE: ${{ (github.event_name == 'schedule' || github.event_name == 'push') && 'live' || inputs.run_mode }}
+      OUTPUT_DIR: output/a4
+      A4_STATUS_DIR: status/a4
+      POLL_SECONDS: "10"
+      MIN_TWSE_SYMBOLS: "800"
+      MIN_TPEX_SYMBOLS: "600"
+      MIN_TOTAL_SYMBOLS: "1500"
+      MAX_TOTAL_SYMBOLS: "3000"
+      PER_CYCLE_FRESH_COVERAGE: "0.97"
+      MIN_PREOPEN_VALID_CYCLES: "0.95"
+      MIN_OPEN_VALID_CYCLES: "0.90"
+      MIN_P05_SYMBOL_COVERAGE: "0.95"
+      MAX_CONSECUTIVE_INVALID_CYCLES: "2"
+      MAX_REQUEST_ERROR_RATE: "0.05"
+      MAX_ALLOWED_GAP_SECONDS: "30"
       DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
 
     steps:
@@ -80,251 +61,195 @@ jobs:
           ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 0
 
-      - name: Production duplicate guard
-        id: guard
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if [ "$RUN_MODE" != "live" ]; then
-            echo "should_run=true" >> "$GITHUB_OUTPUT"
-            echo "reason=non_live" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          DATE_TW=$(TZ=Asia/Taipei date +%F)
-          git fetch origin "$DEFAULT_BRANCH" --quiet
-          COMPLETED_PATH="status/a4/${DATE_TW}_COMPLETED.json"
-
-          if git cat-file -e "origin/${DEFAULT_BRANCH}:${COMPLETED_PATH}" 2>/dev/null; then
-            echo "should_run=false" >> "$GITHUB_OUTPUT"
-            echo "reason=already_completed" >> "$GITHUB_OUTPUT"
-            echo "A4 live run already completed for ${DATE_TW}; duplicate run exits cleanly."
-            exit 0
-          fi
-
-          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
-            HH=$(TZ=Asia/Taipei date +%H)
-            MM=$(TZ=Asia/Taipei date +%M)
-            NOW_MIN=$((10#$HH * 60 + 10#$MM))
-            PUSH_START=$((7 * 60 + 30))
-            PUSH_END=$((8 * 60 + 35))
-
-            if [ "$NOW_MIN" -lt "$PUSH_START" ] || [ "$NOW_MIN" -gt "$PUSH_END" ]; then
-              echo "should_run=false" >> "$GITHUB_OUTPUT"
-              echo "reason=outside_primary_recovery_window" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-
-            if [ ! -f status/a4/recovery_trigger.json ]; then
-              echo "should_run=false" >> "$GITHUB_OUTPUT"
-              echo "reason=missing_trigger_payload" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-
-            TRIGGER_DATE=$(jq -r '.date // ""' status/a4/recovery_trigger.json)
-            TRIGGER_BY=$(jq -r '.requested_by // ""' status/a4/recovery_trigger.json)
-            TRIGGER_ATTEMPT=$(jq -r '.attempt // -1' status/a4/recovery_trigger.json)
-
-            if [ "$TRIGGER_DATE" != "$DATE_TW" ]; then
-              echo "should_run=false" >> "$GITHUB_OUTPUT"
-              echo "reason=stale_trigger_date" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-
-            case "$TRIGGER_BY" in
-              ChatGPT_A4_PrimaryClock|ChatGPT_A4_Watchdog) ;;
-              *)
-                echo "should_run=false" >> "$GITHUB_OUTPUT"
-                echo "reason=unauthorized_trigger_source" >> "$GITHUB_OUTPUT"
-                exit 0
-                ;;
-            esac
-
-            if ! [[ "$TRIGGER_ATTEMPT" =~ ^[0-2]$ ]]; then
-              echo "should_run=false" >> "$GITHUB_OUTPUT"
-              echo "reason=invalid_trigger_attempt" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-          fi
-
-          echo "should_run=true" >> "$GITHUB_OUTPUT"
-          echo "reason=authorized_live_start" >> "$GITHUB_OUTPUT"
-
-      - name: Python
-        if: steps.guard.outputs.should_run == 'true'
+      - name: Python 3.12
         uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
-      - name: Install
-        if: steps.guard.outputs.should_run == 'true'
+      - name: Install runtime
         run: |
           python -m pip install --upgrade pip
           pip install pandas requests pyarrow
 
-      - name: Wait until final market-gate window
-        if: steps.guard.outputs.should_run == 'true' && env.RUN_MODE == 'live'
+      - name: Static compile and integrated selftest
+        run: |
+          python -m py_compile "A4_001A_CompleteControlPoint.py" "A4_001_TWSE_MIS盤前試撮抓取.py"
+          python "A4_001A_CompleteControlPoint.py" --mode selftest
+
+      - name: Run complete production control point
+        id: control
+        continue-on-error: true
+        run: python "A4_001A_CompleteControlPoint.py" --mode live
+
+      - name: Upload complete evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: qts-a4-complete-${{ github.run_id }}
+          path: output/a4/
+          if-no-files-found: warn
+          retention-days: 90
+          compression-level: 6
+
+      - name: Persist formal status evidence
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
+          DATE_TW=$(TZ=Asia/Taipei date +%F)
+          RUN_FILE="status/a4/${DATE_TW}_${GITHUB_RUN_ID}.json"
+          COMPLETED_FILE="status/a4/${DATE_TW}_COMPLETED.json"
+          TMP_DIR=$(mktemp -d)
+          mkdir -p "$TMP_DIR/status/a4"
+
+          for f in status/a4/latest.json "$RUN_FILE" "$COMPLETED_FILE"; do
+            if [ -f "$f" ]; then
+              cp "$f" "$TMP_DIR/status/a4/$(basename "$f")"
+            fi
+          done
+
+          git fetch origin "$DEFAULT_BRANCH"
+          git reset --hard "origin/$DEFAULT_BRANCH"
+          mkdir -p status/a4
+          cp -f "$TMP_DIR"/status/a4/* status/a4/ 2>/dev/null || true
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add status/a4/latest.json "$RUN_FILE" 2>/dev/null || true
+          if [ -f "$COMPLETED_FILE" ]; then git add "$COMPLETED_FILE"; fi
+
+          if git diff --cached --quiet; then
+            echo "No status changes to commit"
+            exit 0
+          fi
+
+          git commit -m "A4 complete status ${DATE_TW} run ${GITHUB_RUN_ID}"
+          for attempt in 1 2 3 4 5; do
+            if git push origin "$DEFAULT_BRANCH"; then exit 0; fi
+            if [ "$attempt" -eq 5 ]; then exit 1; fi
+            git fetch origin "$DEFAULT_BRANCH"
+            git rebase "origin/$DEFAULT_BRANCH"
+            sleep $((attempt * 2))
+          done
+
+      - name: Enforce complete control point result
+        if: always()
+        run: |
+          if [ "${{ steps.control.outcome }}" != "success" ]; then exit 1; fi
+
+  watchdog:
+    name: watchdog
+    if: >-
+      github.event_name == 'schedule' && github.event.schedule == '15 0 * * 1-5'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    concurrency:
+      group: qts-a4-watchdog
+      cancel-in-progress: false
+    env:
+      TZ: Asia/Taipei
+      OUTPUT_DIR: output/a4
+      A4_STATUS_DIR: status/a4
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      A4_WORKFLOW_FILE: scraper.yml
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout latest default branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 1
+
+      - name: Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas requests pyarrow
+
+      - name: Static compile and integrated selftest
+        run: |
+          python -m py_compile "A4_001A_CompleteControlPoint.py" "A4_001_TWSE_MIS盤前試撮抓取.py"
+          python "A4_001A_CompleteControlPoint.py" --mode selftest
+
+      - name: Run integrated two-stage watchdog
+        shell: bash
+        run: |
+          set -u
+          FIRST_RC=0
+          FINAL_RC=0
+
+          python "A4_001A_CompleteControlPoint.py" --mode watchdog --watchdog-stage first || FIRST_RC=$?
+
           HH=$(TZ=Asia/Taipei date +%H)
           MM=$(TZ=Asia/Taipei date +%M)
           SS=$(TZ=Asia/Taipei date +%S)
           NOW_SEC=$((10#$HH * 3600 + 10#$MM * 60 + 10#$SS))
-          TARGET_SEC=$((8 * 3600 + 28 * 60 + 30))
-          END_SEC=$((9 * 3600 + 30 * 60))
-          if [ "$NOW_SEC" -ge "$END_SEC" ]; then
-            echo "Runner started after 09:30; scraper will fail closed."
-          elif [ "$NOW_SEC" -lt "$TARGET_SEC" ]; then
-            WAIT_SEC=$((TARGET_SEC - NOW_SEC))
-            echo "Runner awake early. Waiting ${WAIT_SEC}s until final market gate."
-            sleep "$WAIT_SEC"
-          else
-            echo "Already at/after 08:28:30; run market gate immediately."
+          FINAL_SEC=$((8 * 3600 + 29 * 60))
+          if [ "$NOW_SEC" -lt "$FINAL_SEC" ]; then
+            sleep $((FINAL_SEC - NOW_SEC))
           fi
 
-      - name: TWSE trading-day and emergency-closure gate
-        if: steps.guard.outputs.should_run == 'true'
-        id: market_gate
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ "$RUN_MODE" != "live" ]; then
-            echo "should_run=true" >> "$GITHUB_OUTPUT"
-            echo "market_status=NON_LIVE" >> "$GITHUB_OUTPUT"
-            echo "calendar_verified=true" >> "$GITHUB_OUTPUT"
-            echo "emergency_verified=true" >> "$GITHUB_OUTPUT"
-            exit 0
+          python "A4_001A_CompleteControlPoint.py" --mode watchdog --watchdog-stage final || FINAL_RC=$?
+
+          if [ "$FINAL_RC" -ne 0 ]; then exit "$FINAL_RC"; fi
+          if [ "$FIRST_RC" -ne 0 ]; then
+            echo "First watchdog check failed but final recheck completed; preserving final result."
           fi
-          python A4_001G_TradingDayGate.py
-          echo "should_run=$(jq -r '.should_run' output/mis/market_gate.json)" >> "$GITHUB_OUTPUT"
-          echo "market_status=$(jq -r '.market_status' output/mis/market_gate.json)" >> "$GITHUB_OUTPUT"
-          echo "calendar_verified=$(jq -r '.calendar_verified' output/mis/market_gate.json)" >> "$GITHUB_OUTPUT"
-          echo "emergency_verified=$(jq -r '.emergency_verified // false' output/mis/market_gate.json)" >> "$GITHUB_OUTPUT"
-          cat output/mis/market_gate.json
 
-      - name: Run A4 MIS scraper
-        if: steps.guard.outputs.should_run == 'true' && steps.market_gate.outputs.should_run == 'true'
-        id: scraper
-        continue-on-error: true
-        run: python "A4_001_TWSE_MIS盤前試撮抓取.py"
-
-      - name: Upload captured data
-        if: ${{ always() && steps.guard.outputs.should_run == 'true' }}
+      - name: Upload watchdog evidence
+        if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: qts-a4-mis-${{ github.run_id }}
-          path: output/mis/
-          if-no-files-found: warn
-          retention-days: 90
+          name: qts-a4-watchdog-${{ github.run_id }}
+          path: output/a4/
+          if-no-files-found: ignore
+          retention-days: 30
 
-      - name: Persist A4 run status to repository
-        if: ${{ always() && steps.guard.outputs.should_run == 'true' }}
-        env:
-          SCRAPER_OUTCOME: ${{ steps.scraper.outcome }}
-          MARKET_STATUS: ${{ steps.market_gate.outputs.market_status }}
-          MARKET_SHOULD_RUN: ${{ steps.market_gate.outputs.should_run }}
-          CALENDAR_VERIFIED: ${{ steps.market_gate.outputs.calendar_verified }}
-          EMERGENCY_VERIFIED: ${{ steps.market_gate.outputs.emergency_verified }}
-          EVENT_NAME: ${{ github.event_name }}
-          RUN_ID: ${{ github.run_id }}
-          RUN_ATTEMPT: ${{ github.run_attempt }}
+  diagnostics:
+    name: diagnostics
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.run_mode == 'selftest' || inputs.run_mode == 'env_test')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: qts-a4-diagnostics-${{ github.run_id }}
+      cancel-in-progress: false
+    env:
+      TZ: Asia/Taipei
+      OUTPUT_DIR: output/a4
+      A4_STATUS_DIR: status/a4
+
+    steps:
+      - name: Checkout latest default branch
+        uses: actions/checkout@v6
+
+      - name: Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime
         run: |
-          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install pandas requests pyarrow
 
-          DATE_TW=$(TZ=Asia/Taipei date +%F)
-          NOW_TW=$(TZ=Asia/Taipei date --iso-8601=seconds)
-          REPORT=""
-          EXECUTED_SHA=$(git rev-parse HEAD)
+      - name: Compile
+        run: python -m py_compile "A4_001A_CompleteControlPoint.py" "A4_001_TWSE_MIS盤前試撮抓取.py"
 
-          git pull --rebase origin "$DEFAULT_BRANCH"
-          mkdir -p status/a4
+      - name: Run diagnostics mode
+        run: python "A4_001A_CompleteControlPoint.py" --mode "${{ inputs.run_mode }}"
 
-          case "$MARKET_STATUS" in
-            MARKET_CLOSED*)
-              if [ -f "output/mis/market_gate.json" ]; then
-                REPORT="output/mis/market_gate.json"
-              fi
-              ;;
-          esac
-
-          if [ -z "$REPORT" ] && [ -f "output/mis/report_${DATE_TW}.json" ]; then
-            REPORT="output/mis/report_${DATE_TW}.json"
-          elif [ -z "$REPORT" ] && [ -f "output/mis/env_test_report.json" ]; then
-            REPORT="output/mis/env_test_report.json"
-          elif [ -z "$REPORT" ] && [ -f "output/mis/fatal_error.json" ]; then
-            REPORT="output/mis/fatal_error.json"
-          fi
-
-          if [ -n "$REPORT" ]; then
-            jq --arg checked_at "$NOW_TW" \
-               --arg workflow_outcome "$SCRAPER_OUTCOME" \
-               --arg market_status "$MARKET_STATUS" \
-               --arg market_should_run "$MARKET_SHOULD_RUN" \
-               --arg calendar_verified "$CALENDAR_VERIFIED" \
-               --arg emergency_verified "$EMERGENCY_VERIFIED" \
-               --arg event_name "$EVENT_NAME" \
-               --arg run_id "$RUN_ID" \
-               --arg run_attempt "$RUN_ATTEMPT" \
-               --arg sha "$EXECUTED_SHA" \
-               '. + {
-                 checked_at: $checked_at,
-                 workflow_outcome: $workflow_outcome,
-                 market_status: $market_status,
-                 market_should_run: ($market_should_run == "true"),
-                 calendar_verified: ($calendar_verified == "true"),
-                 emergency_verified: ($emergency_verified == "true"),
-                 event_name: $event_name,
-                 run_id: $run_id,
-                 run_attempt: $run_attempt,
-                 source_commit: $sha,
-                 production_acceptance_applicable: (($market_status | startswith("MARKET_CLOSED")) | not),
-                 pass: (if ($market_status | startswith("MARKET_CLOSED")) then true else (((.pass // .pass_candidate // false) == true) and ($workflow_outcome == "success")) end)
-               }' "$REPORT" > status/a4/latest.json
-          else
-            jq -n --arg checked_at "$NOW_TW" \
-                  --arg workflow_outcome "$SCRAPER_OUTCOME" \
-                  --arg market_status "$MARKET_STATUS" \
-                  --arg event_name "$EVENT_NAME" \
-                  --arg run_id "$RUN_ID" \
-                  --arg run_attempt "$RUN_ATTEMPT" \
-                  --arg sha "$EXECUTED_SHA" \
-                  '{checked_at: $checked_at, workflow_outcome: $workflow_outcome, market_status: $market_status, event_name: $event_name, run_id: $run_id, run_attempt: $run_attempt, source_commit: $sha, pass: false, reason: "NO_REPORT_FILE"}' > status/a4/latest.json
-          fi
-
-          cp status/a4/latest.json "status/a4/${DATE_TW}_${RUN_ID}.json"
-          if jq -e '.pass == true' status/a4/latest.json >/dev/null; then
-            cp status/a4/latest.json "status/a4/${DATE_TW}_COMPLETED.json"
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add status/a4/latest.json "status/a4/${DATE_TW}_${RUN_ID}.json"
-          if [ -f "status/a4/${DATE_TW}_COMPLETED.json" ]; then
-            git add "status/a4/${DATE_TW}_COMPLETED.json"
-          fi
-
-          if git diff --cached --quiet; then
-            echo "No status changes to commit"
-          else
-            git commit -m "A4 status: ${DATE_TW} run ${RUN_ID}"
-            for push_attempt in 1 2 3 4 5; do
-              if git push origin "$DEFAULT_BRANCH"; then break; fi
-              if [ "$push_attempt" -eq 5 ]; then exit 1; fi
-              git fetch origin "$DEFAULT_BRANCH"
-              git rebase "origin/$DEFAULT_BRANCH"
-              sleep $((push_attempt * 2))
-            done
-          fi
-
-      - name: Enforce scraper result
+      - name: Upload diagnostics evidence
         if: always()
-        run: |
-          if [ "${{ steps.guard.outcome }}" != "success" ]; then exit 1; fi
-          if [ "${{ steps.guard.outputs.should_run }}" != "true" ]; then exit 0; fi
-          case "${{ steps.market_gate.outputs.market_status }}" in
-            MARKET_CLOSED*) exit 0 ;;
-          esac
-          if [ "${{ steps.market_gate.outputs.should_run }}" != "true" ]; then exit 1; fi
-          if [ "${{ steps.scraper.outcome }}" != "success" ]; then exit 1; fi
+        uses: actions/upload-artifact@v7
+        with:
+          name: qts-a4-diagnostics-${{ github.run_id }}
+          path: output/a4/
+          if-no-files-found: warn
+          retention-days: 30
