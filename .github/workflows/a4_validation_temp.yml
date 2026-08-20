@@ -19,9 +19,6 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    concurrency:
-      group: qts-a4-temporary-validation
-      cancel-in-progress: false
     env:
       TZ: Asia/Taipei
       OUTPUT_DIR: output/a4_validation
@@ -47,14 +44,16 @@ jobs:
         run: |
           set -euo pipefail
           echo "patched=false" >> "$GITHUB_OUTPUT"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin "$DEFAULT_BRANCH"
+          git reset --hard "origin/$DEFAULT_BRANCH"
           if [ ! -f A4_V23_patch.py ]; then
             exit 0
           fi
           python A4_V23_patch.py
           rm A4_V23_patch.py
           python -m py_compile "A4_001A_CompleteControlPoint.py"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add A4_001A_CompleteControlPoint.py A4_V23_patch.py
           git commit -m "A4: harden full-market warmup and strict validation V2.3"
           git push origin "$DEFAULT_BRANCH"
