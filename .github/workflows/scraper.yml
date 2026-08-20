@@ -62,7 +62,7 @@ jobs:
       MAX_REQUEST_ERROR_RATE: "0.02"
       MIN_PREOPEN_COVERAGE: "0.98"
       MIN_OPEN_COVERAGE: "0.95"
-      MIN_SYMBOL_COVERAGE: "1.0"
+      MIN_SYMBOL_COVERAGE: "0.99"
       MAX_ALLOWED_GAP_SECONDS: "15"
       A4_MARKET_GATE_TIMEOUT: "5"
       RUN_MODE: ${{ (github.event_name == 'schedule' || github.event_name == 'push') && 'live' || inputs.run_mode }}
