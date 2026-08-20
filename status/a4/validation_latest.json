@@ -1,0 +1,208 @@
+{
+  "component": "A4_001A",
+  "version": "A4_001A_COMPLETE_CONTROL_POINT_V2.1.0",
+  "mode": "env_test",
+  "pass": true,
+  "preflight": {
+    "status": "PASS",
+    "gates": {
+      "python": true,
+      "engine_exists": true,
+      "poll": true,
+      "coverage": true,
+      "mode": true
+    },
+    "checked_at": "2026-08-21T01:37:31+08:00"
+  },
+  "universe": {
+    "status": "READY",
+    "sources": {
+      "TWSE": "https://openapi.twse.com.tw/v1/opendata/t187ap03_L",
+      "TPEX": "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap03_O"
+    },
+    "twse": {
+      "raw": 1095,
+      "accepted": 1085,
+      "duplicates": 0,
+      "rejected": {
+        "NON_ORDINARY_CODE": 10
+      },
+      "schema_keys": [
+        "上市日期",
+        "代理發言人",
+        "住址",
+        "傳真機號碼",
+        "公司代號",
+        "公司名稱",
+        "公司簡稱",
+        "出表日期",
+        "外國企業註冊地國",
+        "實收資本額",
+        "已發行普通股數或TDR原股發行股數",
+        "成立日期",
+        "普通股每股面額",
+        "營利事業統一編號",
+        "特別股",
+        "產業別",
+        "發言人",
+        "發言人職稱",
+        "私募股數",
+        "簽證會計師1",
+        "簽證會計師2",
+        "簽證會計師事務所",
+        "網址",
+        "編制財務報表類型",
+        "總機電話",
+        "總經理",
+        "股票過戶機構",
+        "英文簡稱",
+        "英文通訊地址",
+        "董事長",
+        "過戶地址",
+        "過戶電話",
+        "電子郵件信箱"
+      ]
+    },
+    "tpex": {
+      "raw": 890,
+      "accepted": 890,
+      "duplicates": 0,
+      "rejected": {},
+      "schema_keys": [
+        "AccountingFirm",
+        "Address",
+        "CPA.CharteredPublicAccountant.First",
+        "CPA.CharteredPublicAccountant.Second",
+        "Chairman",
+        "CompanyAbbreviation",
+        "CompanyName",
+        "Date",
+        "DateOfIncorporation",
+        "DateOfListing",
+        "DeputySpokesperson",
+        "EmailAddress",
+        "Fax",
+        "GeneralManager",
+        "IssueShares",
+        "Paidin.Capital.NTDollars",
+        "ParValueOfCommonStock",
+        "PreferredStock.shares",
+        "PreparationOfFinancialReportType",
+        "PrivateStock.shares",
+        "Registration",
+        "SecuritiesCompanyCode",
+        "SecuritiesIndustryCode",
+        "Spokesman",
+        "StockTransferAgent",
+        "StockTransferAgentAddress",
+        "StockTransferAgentTelephone",
+        "Symbol",
+        "Telephone",
+        "TitleOfSpokesman",
+        "UnifiedBusinessNo.",
+        "WebAddress"
+      ]
+    },
+    "total": 1975,
+    "hash": "447b4c4d90983d73b658e883d65c50e38cd3acae3b365841a04063aba4262e46",
+    "unique_key": "market|code",
+    "gates": {
+      "twse_count": true,
+      "tpex_count": true,
+      "total_count": true,
+      "unique_market_code": true,
+      "global_code_unique": true,
+      "twse_schema": true,
+      "tpex_schema": true
+    },
+    "checked_at": "2026-08-21T01:38:08+08:00"
+  },
+  "engine_returncode": 0,
+  "engine": {
+    "version": "1.5.0",
+    "mode": "env_test",
+    "started_at": "2026-08-21T01:38:08.636723+08:00",
+    "finished_at": "2026-08-21T01:38:36.380326+08:00",
+    "requested_symbols": 1975,
+    "returned_symbols": 1968,
+    "missing_symbols": [
+      "1589",
+      "2867",
+      "4747",
+      "4804",
+      "6176",
+      "6241",
+      "8105"
+    ],
+    "warmup_ok_count": 0,
+    "warmup_total": 4,
+    "warmup": [
+      {
+        "ok": false,
+        "errors": [
+          "https://mis.twse.com.tw/stock/index.jsp:HTTP_404",
+          "https://mis.twse.com.tw/stock/fibest.jsp:HTTP_404",
+          "https://mis.twse.com.tw/stock/index.jsp:HTTP_404",
+          "https://mis.twse.com.tw/stock/fibest.jsp:HTTP_404",
+          "https://mis.twse.com.tw/stock/index.jsp:HTTP_404",
+          "https://mis.twse.com.tw/stock/fibest.jsp:HTTP_404"
+        ],
+        "cookie_count": 0,
+        "session_index": 0
+      },
+      {
+        "ok": false,
+        "errors": [
+          "https://mis.twse.com.tw/stock/index.jsp:HTTP_404",
+          "https://mis.twse.com.tw/stock/fibest.jsp:HTTP_404",
+          "https://mis.twse.com.tw/stock/index.jsp:HTTP_404",
+          "https://mis.twse.com.tw/stock/fibest.jsp:HTTP_404",
+          "https://mis.twse.com.tw/stock/index.jsp:HTTP_404",
+          "https://mis.twse.com.tw/stock/fibest.jsp:HTTP_404"
+        ],
+        "cookie_count": 0,
+        "session_index": 1
+      },
+      {
+        "ok": false,
+        "errors": [
+          "https://mis.twse.com.tw/stock/index.jsp:HTTP_404",
+          "https://mis.twse.com.tw/stock/fibest.jsp:HTTP_404",
+          "https://mis.twse.com.tw/stock/index.jsp:HTTP_404",
+          "https://mis.twse.com.tw/stock/fibest.jsp:HTTP_404",
+          "https://mis.twse.com.tw/stock/index.jsp:HTTP_404",
+          "https://mis.twse.com.tw/stock/fibest.jsp:HTTP_404"
+        ],
+        "cookie_count": 0,
+        "session_index": 2
+      },
+      {
+        "ok": false,
+        "errors": [
+          "https://mis.twse.com.tw/stock/index.jsp:HTTP_404",
+          "https://mis.twse.com.tw/stock/fibest.jsp:HTTP_404",
+          "https://mis.twse.com.tw/stock/index.jsp:HTTP_404",
+          "https://mis.twse.com.tw/stock/fibest.jsp:HTTP_404",
+          "https://mis.twse.com.tw/stock/index.jsp:HTTP_404",
+          "https://mis.twse.com.tw/stock/fibest.jsp:HTTP_404"
+        ],
+        "cookie_count": 0,
+        "session_index": 3
+      }
+    ],
+    "request_attempts": 21,
+    "request_errors": 0,
+    "error_type_counts": {},
+    "sample_errors": [],
+    "cycle_elapsed_seconds": 3.0370918849999953,
+    "cycle_budget_seconds": 9.0,
+    "pass": true
+  },
+  "engine_log_tail": "{\"version\": \"1.5.0\", \"mode\": \"env_test\", \"started_at\": \"2026-08-21T01:38:08.636723+08:00\", \"finished_at\": \"2026-08-21T01:38:36.380326+08:00\", \"requested_symbols\": 1975, \"returned_symbols\": 1968, \"missing_symbols\": [\"1589\", \"2867\", \"4747\", \"4804\", \"6176\", \"6241\", \"8105\"], \"warmup_ok_count\": 0, \"warmup_total\": 4, \"warmup\": [{\"ok\": false, \"errors\": [\"https://mis.twse.com.tw/stock/index.jsp:HTTP_404\", \"https://mis.twse.com.tw/stock/fibest.jsp:HTTP_404\", \"https://mis.twse.com.tw/stock/index.jsp:HTTP_404\", \"https://mis.twse.com.tw/stock/fibest.jsp:HTTP_404\", \"https://mis.twse.com.tw/stock/index.jsp:HTTP_404\", \"https://mis.twse.com.tw/stock/fibest.jsp:HTTP_404\"], \"cookie_count\": 0, \"session_index\": 0}, {\"ok\": false, \"errors\": [\"https://mis.twse.com.tw/stock/index.jsp:HTTP_404\", \"https://mis.twse.com.tw/stock/fibest.jsp:HTTP_404\", \"https://mis.twse.com.tw/stock/index.jsp:HTTP_404\", \"https://mis.twse.com.tw/stock/fibest.jsp:HTTP_404\", \"https://mis.twse.com.tw/stock/index.jsp:HTTP_404\", \"https://mis.twse.com.tw/stock/fibest.jsp:HTTP_404\"], \"cookie_count\": 0, \"session_index\": 1}, {\"ok\": false, \"errors\": [\"https://mis.twse.com.tw/stock/index.jsp:HTTP_404\", \"https://mis.twse.com.tw/stock/fibest.jsp:HTTP_404\", \"https://mis.twse.com.tw/stock/index.jsp:HTTP_404\", \"https://mis.twse.com.tw/stock/fibest.jsp:HTTP_404\", \"https://mis.twse.com.tw/stock/index.jsp:HTTP_404\", \"https://mis.twse.com.tw/stock/fibest.jsp:HTTP_404\"], \"cookie_count\": 0, \"session_index\": 2}, {\"ok\": false, \"errors\": [\"https://mis.twse.com.tw/stock/index.jsp:HTTP_404\", \"https://mis.twse.com.tw/stock/fibest.jsp:HTTP_404\", \"https://mis.twse.com.tw/stock/index.jsp:HTTP_404\", \"https://mis.twse.com.tw/stock/fibest.jsp:HTTP_404\", \"https://mis.twse.com.tw/stock/index.jsp:HTTP_404\", \"https://mis.twse.com.tw/stock/fibest.jsp:HTTP_404\"], \"cookie_count\": 0, \"session_index\": 3}], \"request_attempts\": 21, \"request_errors\": 0, \"error_type_counts\": {}, \"sample_errors\": [], \"cycle_elapsed_seconds\": 3.0370918849999953, \"cycle_budget_seconds\": 9.0, \"pass\": true}\n",
+  "checked_at": "2026-08-21T01:38:36+08:00",
+  "validation_run_id": "32398609548",
+  "validation_sha": "0790e0f73af3d196e9430448fbd901adfc3e88d6",
+  "validation_trigger_sha": "0790e0f73af3d196e9430448fbd901adfc3e88d6",
+  "selftest_outcome": "success",
+  "probe_outcome": "success"
+}
