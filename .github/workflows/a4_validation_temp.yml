@@ -1,0 +1,61 @@
+name: QTS A4 Temporary Validation
+run-name: A4 VALIDATION | ${{ github.run_id }} | ${{ github.sha }}
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - status/a4/validation_trigger.json
+      - .github/workflows/a4_validation_temp.yml
+      - A4_001A_CompleteControlPoint.py
+      - A4_001_TWSE_MIS盤前試撮抓取.py
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TZ: Asia/Taipei
+      OUTPUT_DIR: output/a4_validation
+      A4_STATUS_DIR: status/a4
+      POLL_SECONDS: "10"
+      MIN_TWSE_SYMBOLS: "800"
+      MIN_TPEX_SYMBOLS: "600"
+      MIN_TOTAL_SYMBOLS: "1500"
+      MAX_TOTAL_SYMBOLS: "3000"
+      ENV_TEST_MIN_COVERAGE: "0.95"
+      ENV_TEST_MAX_ERROR_RATE: "0.05"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install runtime
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas requests pyarrow
+      - name: Compile
+        run: python -m py_compile "A4_001A_CompleteControlPoint.py" "A4_001_TWSE_MIS盤前試撮抓取.py"
+      - name: Integrated selftest
+        run: python "A4_001A_CompleteControlPoint.py" --mode selftest
+      - name: Full-market environment probe
+        run: python "A4_001A_CompleteControlPoint.py" --mode env_test
+      - name: Show evidence
+        if: always()
+        run: |
+          echo '--- control report ---'
+          cat output/a4_validation/env_test_report.json 2>/dev/null || true
+          echo '--- engine report ---'
+          cat output/a4_validation/engine/env_test_report.json 2>/dev/null || true
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: qts-a4-validation-${{ github.run_id }}
+          path: output/a4_validation/
+          if-no-files-found: warn
+          retention-days: 7
