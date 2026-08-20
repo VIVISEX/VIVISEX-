@@ -8,6 +8,7 @@ on:
     paths:
       - status/a4/validation_trigger.json
       - .github/workflows/a4_validation_temp.yml
+      - A4_V23_patch.py
       - A4_001A_CompleteControlPoint.py
       - A4_001_TWSE_MIS盤前試撮抓取.py
 
@@ -18,6 +19,9 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    concurrency:
+      group: qts-a4-temporary-validation
+      cancel-in-progress: false
     env:
       TZ: Asia/Taipei
       OUTPUT_DIR: output/a4_validation
@@ -37,29 +41,51 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
+      - name: Apply staged V2.3 patch once
+        id: patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "patched=false" >> "$GITHUB_OUTPUT"
+          if [ ! -f A4_V23_patch.py ]; then
+            exit 0
+          fi
+          python A4_V23_patch.py
+          rm A4_V23_patch.py
+          python -m py_compile "A4_001A_CompleteControlPoint.py"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add A4_001A_CompleteControlPoint.py A4_V23_patch.py
+          git commit -m "A4: harden full-market warmup and strict validation V2.3"
+          git push origin "$DEFAULT_BRANCH"
+          echo "patched=true" >> "$GITHUB_OUTPUT"
       - name: Install runtime
+        if: steps.patch.outputs.patched != 'true'
         run: |
           python -m pip install --upgrade pip
           pip install pandas requests pyarrow
       - name: Compile
+        if: steps.patch.outputs.patched != 'true'
         run: python -m py_compile "A4_001A_CompleteControlPoint.py" "A4_001_TWSE_MIS盤前試撮抓取.py"
       - name: Integrated selftest
+        if: steps.patch.outputs.patched != 'true'
         id: selftest
         continue-on-error: true
         run: python "A4_001A_CompleteControlPoint.py" --mode selftest
       - name: Full-market environment probe
+        if: steps.patch.outputs.patched != 'true'
         id: probe
         continue-on-error: true
         run: python "A4_001A_CompleteControlPoint.py" --mode env_test
       - name: Show evidence
-        if: always()
+        if: always() && steps.patch.outputs.patched != 'true'
         run: |
           echo '--- control report ---'
           cat output/a4_validation/env_test_report.json 2>/dev/null || true
           echo '--- engine report ---'
           cat output/a4_validation/engine/env_test_report.json 2>/dev/null || true
       - name: Persist validation evidence
-        if: always()
+        if: always() && steps.patch.outputs.patched != 'true'
         env:
           SELFTEST_OUTCOME: ${{ steps.selftest.outcome }}
           PROBE_OUTCOME: ${{ steps.probe.outcome }}
@@ -78,26 +104,28 @@ jobs:
                   obj = {'pass': False, 'error': f'VALIDATION_REPORT_PARSE_FAIL:{exc}'}
           else:
               obj = {'pass': False, 'error': 'VALIDATION_REPORT_MISSING'}
+          run_id = os.environ.get('GITHUB_RUN_ID', 'unknown')
           obj.update({
-              'validation_run_id': os.environ.get('GITHUB_RUN_ID'),
+              'validation_run_id': run_id,
               'validation_sha': os.environ.get('GITHUB_SHA'),
-              'validation_trigger_sha': os.environ.get('GITHUB_SHA'),
               'selftest_outcome': os.environ.get('SELFTEST_OUTCOME'),
               'probe_outcome': os.environ.get('PROBE_OUTCOME'),
           })
-          Path('status/a4/validation_latest.json').write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding='utf-8')
+          text = json.dumps(obj, ensure_ascii=False, indent=2)
+          Path('status/a4/validation_latest.json').write_text(text, encoding='utf-8')
+          Path(f'status/a4/validation_{run_id}.json').write_text(text, encoding='utf-8')
           PY
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin "$DEFAULT_BRANCH"
           git rebase "origin/$DEFAULT_BRANCH"
-          git add status/a4/validation_latest.json
+          git add status/a4/validation_latest.json status/a4/validation_${GITHUB_RUN_ID}.json
           if ! git diff --cached --quiet; then
             git commit -m "A4 validation evidence run ${GITHUB_RUN_ID}"
             git push origin "$DEFAULT_BRANCH"
           fi
       - name: Upload validation evidence
-        if: always()
+        if: always() && steps.patch.outputs.patched != 'true'
         uses: actions/upload-artifact@v7
         with:
           name: qts-a4-validation-${{ github.run_id }}
@@ -105,7 +133,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
       - name: Enforce validation result
-        if: always()
+        if: always() && steps.patch.outputs.patched != 'true'
         run: |
           if [ "${{ steps.selftest.outcome }}" != "success" ]; then exit 1; fi
           if [ "${{ steps.probe.outcome }}" != "success" ]; then exit 1; fi
