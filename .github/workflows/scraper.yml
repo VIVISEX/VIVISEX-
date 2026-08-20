@@ -32,7 +32,7 @@ permissions:
 
 concurrency:
   group: ${{ (github.event_name == 'schedule' || github.event_name == 'push' || inputs.run_mode == 'live') && 'qts-a4-mis-production' || format('qts-a4-mis-test-{0}', github.run_id) }}
-  cancel-in-progress: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.run_mode == 'live') }}
+  cancel-in-progress: false
 
 jobs:
   scrape:
