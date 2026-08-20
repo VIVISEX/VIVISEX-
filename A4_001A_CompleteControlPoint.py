@@ -15,7 +15,7 @@ import re
 import subprocess
 import sys
 import time
-from collections import Counter
+from collections import Counter, deque
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, time as dtime, timezone
 from html.parser import HTMLParser
@@ -26,7 +26,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import requests
 
-VERSION = "A4_001A_COMPLETE_CONTROL_POINT_V2.3.0"
+VERSION = "A4_001A_COMPLETE_CONTROL_POINT_V2.4.0"
 COMPONENT = "A4_001A"
 TZ = ZoneInfo("Asia/Taipei")
 ENGINE = Path(__file__).resolve().parent / "A4_001_TWSE_MIS盤前試撮抓取.py"
@@ -37,7 +37,7 @@ TWSE_COMPANY = "https://openapi.twse.com.tw/v1/opendata/t187ap03_L"
 TPEX_COMPANY = "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap03_O"
 TWSE_HOLIDAY = "https://openapi.twse.com.tw/v1/holidaySchedule/holidaySchedule"
 DGPA = "https://www.dgpa.gov.tw/typh/daily/nds.html"
-UA = "Mozilla/5.0 QTS-A4-Complete-Control-Point/2.3"
+UA = "Mozilla/5.0 QTS-A4-Complete-Control-Point/2.4"
 START = dtime(8, 30)
 PREOPEN_END = dtime(9, 0)
 END = dtime(9, 30)
@@ -56,6 +56,11 @@ MAX_REQ_ERR = float(os.getenv("MAX_REQUEST_ERROR_RATE", "0.05"))
 MAX_GAP = float(os.getenv("MAX_ALLOWED_GAP_SECONDS", "30"))
 ENV_TEST_MIN_COVERAGE = float(os.getenv("ENV_TEST_MIN_COVERAGE", "0.95"))
 ENV_TEST_MAX_ERROR_RATE = float(os.getenv("ENV_TEST_MAX_ERROR_RATE", "0.05"))
+RUNTIME_AUDIT_SECONDS = max(10.0, float(os.getenv("RUNTIME_AUDIT_SECONDS", "30")))
+RUNTIME_MIN_COVERAGE = min(1.0, max(0.80, float(os.getenv("RUNTIME_MIN_COVERAGE", "0.97"))))
+RUNTIME_MAX_ERROR_RATE = min(1.0, max(0.0, float(os.getenv("RUNTIME_MAX_ERROR_RATE", "0.05"))))
+RUNTIME_MAX_REPAIRS = max(1, int(os.getenv("RUNTIME_MAX_REPAIRS", "3")))
+RUNTIME_FAIL_CLOSED_WINDOWS = max(2, int(os.getenv("RUNTIME_FAIL_CLOSED_WINDOWS", "3")))
 
 
 @dataclass(frozen=True)
@@ -235,7 +240,7 @@ def checkpoint(stage: str, **extra: Any) -> None:
 
 
 def preflight(mode: str) -> dict[str, Any]:
-    gates = {"python": sys.version_info >= (3, 12), "engine_exists": ENGINE.exists(), "poll": POLL >= 5, "coverage": 0.8 <= PER_CYCLE <= 1, "mode": mode in {"selftest", "env_test", "live", "watchdog"}}
+    gates = {"python": sys.version_info >= (3, 12), "engine_exists": ENGINE.exists(), "poll": POLL >= 5, "coverage": 0.8 <= PER_CYCLE <= 1, "runtime_audit": 10 <= RUNTIME_AUDIT_SECONDS <= 60 and RUNTIME_MAX_REPAIRS >= 1, "mode": mode in {"selftest", "env_test", "live", "watchdog"}}
     return {"status": "PASS" if all(gates.values()) else "FAIL", "gates": gates, "checked_at": iso()}
 
 
@@ -324,6 +329,129 @@ def run_engine(universe_path: Path, mode: str) -> tuple[int, str]:
             }
 
         core.warm_session = validated_warm_session
+
+        expected_stocks = core.load_stocks(core.STOCKS_FILE)
+        expected_market = {s.code: s.market for s in expected_stocks}
+        expected_codes = set(expected_market)
+        original_capture = core.capture_cycle
+        max_guard_records = max(6, int(math.ceil((RUNTIME_AUDIT_SECONDS * 2.5) / max(1.0, core.POLL_SECONDS))))
+        guard_records: deque[dict[str, Any]] = deque(maxlen=max_guard_records)
+        guard_state = {"repairs": 0, "bad_windows": 0, "last_audit_mono": time.monotonic() - RUNTIME_AUDIT_SECONDS, "profile": "NORMAL"}
+        guard_dir = OUT / "engine"
+        guard_dir.mkdir(parents=True, exist_ok=True)
+        guard_day = now().date().isoformat()
+        guard_latest = guard_dir / f"runtime_guard_{guard_day}.json"
+        guard_log = guard_dir / f"runtime_guard_{guard_day}.ndjson"
+
+        def write_guard(event: dict[str, Any]) -> None:
+            event = {"component": COMPONENT, "version": VERSION, "engine_version": getattr(core, "VERSION", "unknown"), "checked_at": iso(), **event}
+            atomic_json(guard_latest, event)
+            with guard_log.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(event, ensure_ascii=False) + "\n")
+
+        def repair_runtime(reason: str) -> dict[str, Any]:
+            guard_state["repairs"] += 1
+            attempt = int(guard_state["repairs"])
+            transport_reason = reason in {"TRANSPORT_ERROR", "LOW_COVERAGE", "SOURCE_GAP"}
+            if transport_reason:
+                if attempt == 1:
+                    core.PRIMARY_WORKERS = min(core.PRIMARY_WORKERS, 2)
+                    core.RETRY_WORKERS = 1
+                    core.RETRY_TRIGGER_COVERAGE = max(core.RETRY_TRIGGER_COVERAGE, 0.95)
+                    core.BACKOFF_BASE_SECONDS = max(core.BACKOFF_BASE_SECONDS, 1.0)
+                    guard_state["profile"] = "CONSERVATIVE_1"
+                else:
+                    core.PRIMARY_WORKERS = 1
+                    core.RETRY_WORKERS = 1
+                    core.SESSION_POOL_SIZE = min(core.SESSION_POOL_SIZE, 2)
+                    core.RETRY_TRIGGER_COVERAGE = max(core.RETRY_TRIGGER_COVERAGE, 0.97)
+                    core.BACKOFF_BASE_SECONDS = max(core.BACKOFF_BASE_SECONDS, 1.25)
+                    core.BACKOFF_CAP_SECONDS = max(core.BACKOFF_CAP_SECONDS, 5.0)
+                    guard_state["profile"] = "CONSERVATIVE_2"
+            warm = core.init_session_pool()
+            return {"attempt": attempt, "reason": reason, "profile": guard_state["profile"], "primary_workers": core.PRIMARY_WORKERS, "retry_workers": core.RETRY_WORKERS, "session_pool_size": core.SESSION_POOL_SIZE, "retry_trigger_coverage": core.RETRY_TRIGGER_COVERAGE, "warmup_ok_count": sum(1 for x in warm if x.get("ok")), "warmup_total": len(warm)}
+
+        def guarded_capture(stocks: list[Any], cycle_deadline: float):
+            cycle_started = time.monotonic()
+            results, diag = original_capture(stocks, cycle_deadline)
+            merged = results[0]
+            strict_date = core.RUN_MODE == "live"
+            today_compact = core.now_tw().strftime("%Y%m%d")
+            accepted: list[dict[str, Any]] = []
+            seen_codes: set[str] = set()
+            integrity = Counter()
+            for item in list(merged.items):
+                if not isinstance(item, dict):
+                    integrity["non_object"] += 1
+                    continue
+                code = str(item.get("c", "")).strip()
+                market_date = str(item.get("d", "")).strip()
+                market = str(item.get("ex", "")).strip().lower()
+                if not code or not market_date or not market:
+                    integrity["schema_missing"] += 1
+                    continue
+                if code not in expected_codes:
+                    integrity["unexpected_code"] += 1
+                    continue
+                expected_ex = "tse" if expected_market[code] == "TSE" else "otc"
+                if market != expected_ex:
+                    integrity["market_mismatch"] += 1
+                    continue
+                if strict_date and market_date != today_compact:
+                    integrity["stale_date"] += 1
+                    continue
+                if code in seen_codes:
+                    integrity["duplicate_code"] += 1
+                    continue
+                seen_codes.add(code)
+                accepted.append(item)
+            merged.items = accepted
+            accepted_codes = {str(x.get("c", "")).strip() for x in accepted}
+            coverage = len(accepted_codes) / len(expected_codes) if expected_codes else 0.0
+            attempts = int(diag.get("request_attempts") or 0)
+            errors = int(diag.get("request_errors") or 0)
+            error_rate = errors / attempts if attempts else 1.0
+            elapsed = time.monotonic() - cycle_started
+            required_coverage = max(RUNTIME_MIN_COVERAGE, min(1.0, PER_CYCLE))
+            cycle_ok = coverage >= required_coverage and error_rate <= RUNTIME_MAX_ERROR_RATE and not any(integrity.values())
+            record = {"mono": time.monotonic(), "coverage": coverage, "required_coverage": required_coverage, "attempts": attempts, "errors": errors, "error_rate": error_rate, "elapsed_seconds": elapsed, "integrity": dict(integrity), "accepted_symbols": len(accepted_codes), "requested_symbols": len(expected_codes), "missing_symbols": sorted(expected_codes - accepted_codes)[:100], "cycle_ok": cycle_ok}
+            guard_records.append(record)
+            diag["missing_symbols"] = sorted(expected_codes - accepted_codes)
+            diag["returned_symbols"] = len(accepted_codes)
+            diag["runtime_guard"] = record
+            now_mono = time.monotonic()
+            audit_due = core.RUN_MODE == "env_test" or (now_mono - float(guard_state["last_audit_mono"]) >= RUNTIME_AUDIT_SECONDS)
+            if audit_due:
+                guard_state["last_audit_mono"] = now_mono
+                floor = now_mono - RUNTIME_AUDIT_SECONDS - max(1.0, core.POLL_SECONDS)
+                window = [x for x in guard_records if float(x["mono"]) >= floor]
+                total_attempts = sum(int(x["attempts"]) for x in window)
+                total_errors = sum(int(x["errors"]) for x in window)
+                window_error_rate = total_errors / total_attempts if total_attempts else 1.0
+                avg_coverage = sum(float(x["coverage"]) for x in window) / len(window) if window else 0.0
+                min_coverage = min((float(x["coverage"]) for x in window), default=0.0)
+                integrity_totals = Counter()
+                for x in window:
+                    integrity_totals.update(x.get("integrity", {}))
+                bad_cycles = sum(1 for x in window if not x.get("cycle_ok"))
+                window_ok = bool(window) and avg_coverage >= required_coverage and window_error_rate <= RUNTIME_MAX_ERROR_RATE and not any(integrity_totals.values()) and bad_cycles <= 1
+                if window_ok:
+                    guard_state["bad_windows"] = 0
+                    write_guard({"status": "PASS", "profile": guard_state["profile"], "repairs": guard_state["repairs"], "window_cycles": len(window), "bad_cycles": bad_cycles, "average_coverage": avg_coverage, "minimum_coverage": min_coverage, "request_error_rate": window_error_rate, "integrity": dict(integrity_totals)})
+                else:
+                    guard_state["bad_windows"] += 1
+                    if any(integrity_totals.values()): reason = "DATA_INTEGRITY"
+                    elif window_error_rate > RUNTIME_MAX_ERROR_RATE: reason = "TRANSPORT_ERROR"
+                    elif avg_coverage < required_coverage: reason = "LOW_COVERAGE"
+                    else: reason = "SOURCE_GAP"
+                    recovery = repair_runtime(reason) if int(guard_state["repairs"]) < RUNTIME_MAX_REPAIRS else None
+                    fatal = int(guard_state["bad_windows"]) >= RUNTIME_FAIL_CLOSED_WINDOWS or (int(guard_state["repairs"]) >= RUNTIME_MAX_REPAIRS and not window_ok)
+                    write_guard({"status": "FAIL_CLOSED" if fatal else "AUTO_REPAIRED", "reason": reason, "profile": guard_state["profile"], "repairs": guard_state["repairs"], "bad_windows": guard_state["bad_windows"], "window_cycles": len(window), "bad_cycles": bad_cycles, "average_coverage": avg_coverage, "minimum_coverage": min_coverage, "request_error_rate": window_error_rate, "integrity": dict(integrity_totals), "recovery": recovery})
+                    if fatal:
+                        raise RuntimeError(f"RUNTIME_DATA_GUARD_FAIL_CLOSED reason={reason} bad_windows={guard_state['bad_windows']} repairs={guard_state['repairs']}")
+            return results, diag
+
+        core.capture_cycle = guarded_capture
         with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
             rc = int(core.main())
         return rc, buf.getvalue()[-12000:]
@@ -486,7 +614,8 @@ def live() -> int:
     engine_clean_exit = rc == 0
     passed=bool(engine_clean_exit and audit["pass"] and clean["pass"])
     failure_reasons=[k.upper() for k,v in audit["gates"].items() if not v]+([] if clean["pass"] else ["CLEAN_FAIL"])+([] if engine_clean_exit else ["ENGINE_NONZERO_EXIT"])
-    rep={"date":day,"mode":"live","pass":passed,"production_acceptance_applicable":True,"preflight":pf,"universe":urep,"market_gate":gate,"engine_returncode":rc,"engine_clean_exit":engine_clean_exit,"engine_log_tail":log[-4000:],"audit":audit,"clean":clean,"checkpoint":str(CHECKPOINT),"legacy_fixed_stocks_csv_used":False,"failure_reasons":failure_reasons}
+    runtime_guard=read_json(OUT/"engine"/f"runtime_guard_{day}.json") or {}
+    rep={"date":day,"mode":"live","pass":passed,"production_acceptance_applicable":True,"preflight":pf,"universe":urep,"market_gate":gate,"engine_returncode":rc,"engine_clean_exit":engine_clean_exit,"engine_log_tail":log[-4000:],"audit":audit,"clean":clean,"checkpoint":str(CHECKPOINT),"legacy_fixed_stocks_csv_used":False,"failure_reasons":failure_reasons,"runtime_guard":runtime_guard}
     checkpoint("AUDIT",pass_result=passed); write_status(rep); atomic_json(OUT/f"report_{day}.json",rep); print(json.dumps(rep,ensure_ascii=False)); return 0 if passed else 4
 
 
