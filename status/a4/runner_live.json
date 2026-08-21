@@ -1,10 +1,11 @@
 {
   "component": "A4_001A",
   "status": "RUNNER_STARTED",
+  "version": "A4_001A_COMPLETE_CONTROL_POINT_V2.5.0",
   "date": "2026-08-21",
-  "started_at": "2026-08-21T08:57:45+08:00",
-  "run_id": "32434426736",
+  "started_at": "2026-08-21T09:09:06+08:00",
+  "run_id": "32435233408",
   "run_attempt": "1",
-  "event_name": "schedule",
-  "source_commit": "74a7f7b3dea62c4e327cf79fb6fe34c40f6e790c"
+  "event_name": "push",
+  "source_commit": "1a367f0a3b8b833ab4e66b26045145218ba696e2"
 }
