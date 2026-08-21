@@ -1,0 +1,8 @@
+{
+  "component": "A4_001A",
+  "status": "LIVE_TRIGGER_REQUESTED",
+  "date": "2026-08-21",
+  "requested_at": "2026-08-21T08:52:00+08:00",
+  "requested_by": "ChatGPT_A4_Emergency",
+  "reason": "RECOVER_LIVE_CAPTURE_AFTER_TRIGGER_CHAIN_FIX"
+}
