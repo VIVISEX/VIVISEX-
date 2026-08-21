@@ -2,7 +2,7 @@
   "component": "A4_001A",
   "status": "LIVE_TRIGGER_REQUESTED",
   "date": "2026-08-21",
-  "requested_at": "2026-08-21T08:56:00+08:00",
-  "requested_by": "ChatGPT_A4_Emergency",
-  "reason": "START_LATEST_RUNNER_AND_PUBLISH_START_EVIDENCE"
+  "requested_at": "2026-08-21T09:09:00+08:00",
+  "requested_by": "ChatGPT_A4_V25_Qualification",
+  "reason": "RUN_V25_AFTER_TRANSPORT_GUARD_ROOT_CAUSE_FIX"
 }
