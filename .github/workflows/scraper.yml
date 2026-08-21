@@ -35,12 +35,13 @@ jobs:
     concurrency:
       group: qts-a4-mis-production
       cancel-in-progress: false
-      queue: max
     env:
       TZ: Asia/Taipei
       OUTPUT_DIR: output/a4
       A4_STATUS_DIR: status/a4
       POLL_SECONDS: "10"
+      RUNTIME_AUDIT_SECONDS: "30"
+      RUNTIME_MAX_REPAIRS: "2"
       MIN_TWSE_SYMBOLS: "800"
       MIN_TPEX_SYMBOLS: "600"
       MIN_TOTAL_SYMBOLS: "1500"
@@ -224,6 +225,8 @@ jobs:
       TZ: Asia/Taipei
       OUTPUT_DIR: output/a4
       A4_STATUS_DIR: status/a4
+      RUNTIME_AUDIT_SECONDS: "30"
+      RUNTIME_MAX_REPAIRS: "2"
 
     steps:
       - name: Checkout latest default branch
