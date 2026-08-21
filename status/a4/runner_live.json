@@ -2,9 +2,9 @@
   "component": "A4_001A",
   "status": "RUNNER_STARTED",
   "date": "2026-08-21",
-  "started_at": "2026-08-21T08:55:01+08:00",
-  "run_id": "32434404294",
+  "started_at": "2026-08-21T08:57:45+08:00",
+  "run_id": "32434426736",
   "run_attempt": "1",
-  "event_name": "push",
+  "event_name": "schedule",
   "source_commit": "74a7f7b3dea62c4e327cf79fb6fe34c40f6e790c"
 }
