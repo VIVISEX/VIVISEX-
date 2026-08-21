@@ -2,6 +2,11 @@ name: QTS A4 Complete Control Point
 run-name: A4 CCP | ${{ github.event_name }} | ${{ github.run_id }}
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - status/a4/live_trigger.json
   workflow_dispatch:
     inputs:
       run_mode:
@@ -15,8 +20,6 @@ on:
           - live
           - live_recovery
   schedule:
-    # Asia/Taipei Monday-Friday: one 08:00 production trigger and one 08:15 watchdog trigger.
-    # The watchdog stays alive and performs its final recheck at 08:29 in the same job.
     - cron: "0 0 * * 1-5"
     - cron: "15 0 * * 1-5"
 
@@ -28,6 +31,7 @@ jobs:
   production:
     name: production
     if: >-
+      github.event_name == 'push' ||
       (github.event_name == 'schedule' && github.event.schedule == '0 0 * * 1-5') ||
       (github.event_name == 'workflow_dispatch' && (inputs.run_mode == 'live' || inputs.run_mode == 'live_recovery'))
     runs-on: ubuntu-latest
@@ -42,6 +46,7 @@ jobs:
       POLL_SECONDS: "10"
       RUNTIME_AUDIT_SECONDS: "30"
       RUNTIME_MAX_REPAIRS: "2"
+      RUNTIME_FAIL_CLOSED_WINDOWS: "3"
       MIN_TWSE_SYMBOLS: "800"
       MIN_TPEX_SYMBOLS: "600"
       MIN_TOTAL_SYMBOLS: "1500"
@@ -183,9 +188,7 @@ jobs:
           set -u
           FIRST_RC=0
           FINAL_RC=0
-
           python "A4_001A_CompleteControlPoint.py" --mode watchdog --watchdog-stage first || FIRST_RC=$?
-
           HH=$(TZ=Asia/Taipei date +%H)
           MM=$(TZ=Asia/Taipei date +%M)
           SS=$(TZ=Asia/Taipei date +%S)
@@ -194,9 +197,7 @@ jobs:
           if [ "$NOW_SEC" -lt "$FINAL_SEC" ]; then
             sleep $((FINAL_SEC - NOW_SEC))
           fi
-
           python "A4_001A_CompleteControlPoint.py" --mode watchdog --watchdog-stage final || FINAL_RC=$?
-
           if [ "$FINAL_RC" -ne 0 ]; then exit "$FINAL_RC"; fi
           if [ "$FIRST_RC" -ne 0 ]; then
             echo "First watchdog check failed but final recheck completed; preserving final result."
