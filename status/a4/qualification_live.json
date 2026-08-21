@@ -1,9 +1,28 @@
 {
   "component": "A4_001A",
-  "target_version": "V2.6.0",
-  "status": "QUALIFICATION_STARTED",
+  "version": "A4_001A_COMPLETE_CONTROL_POINT_V2.6.0",
+  "status": "ROUND_FAIL",
   "run_id": "32436037935",
-  "started_at": "2026-08-21T09:22:10+08:00",
+  "checked_at": "2026-08-21T09:22:44+08:00",
   "rounds_required": 3,
-  "rounds_passed": 0
+  "rounds_passed": 0,
+  "current_round": 1,
+  "rounds": [
+    {
+      "round": 1,
+      "pass": false,
+      "returncode": 3,
+      "coverage": 0.0,
+      "requested_symbols": 1975,
+      "returned_symbols": 0,
+      "request_attempts": 5,
+      "request_errors": 5,
+      "request_error_rate": 1.0,
+      "cycle_elapsed_seconds": 1.6981737429999981,
+      "cycle_budget_seconds": 15.0,
+      "warmup_ok_count": 2,
+      "warmup_total": 2,
+      "engine_returncode": 2
+    }
+  ]
 }
