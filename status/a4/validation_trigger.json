@@ -1,6 +1,7 @@
 {
   "component": "A4_001A",
-  "validation_round": "V24-LIVE-CHECK-0845",
-  "requested_at": "2026-08-21T08:45:30+08:00",
-  "requested_by": "ChatGPT_A4_Live_Check"
+  "validation_round": "V24-QUAL-R1",
+  "requested_at": "2026-08-21T08:59:00+08:00",
+  "requested_by": "ChatGPT_A4_Qualification",
+  "policy": "3_CONSECUTIVE_FULL_MARKET_PASS_OR_FIX_AND_RESTART"
 }
