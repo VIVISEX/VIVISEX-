@@ -1,5 +1,6 @@
-name: QTS A4 Complete Control Point
-run-name: A4 CCP | ${{ github.event_name }} | ${{ github.run_id }}
+name: QTS A4 Complete Control Point V3
+
+run-name: A4 V3 | ${{ github.event_name }} | ${{ github.run_id }}
 
 on:
   push:
@@ -14,10 +15,16 @@ on:
         required: true
         default: env_test
         type: choice
-        options: [selftest, env_test, live, live_recovery]
+        options:
+          - selftest
+          - env_test
+          - qualify
+          - live
+          - live_recovery
   schedule:
-    - cron: "0 0 * * 1-5"
-    - cron: "15 0 * * 1-5"
+    - cron: "7 0 * * 1-5"
+    - cron: "17 0 * * 1-5"
+    - cron: "22 0 * * 1-5"
 
 permissions:
   contents: write
@@ -25,36 +32,32 @@ permissions:
   statuses: write
 
 jobs:
-  production:
-    name: production
+  control:
+    name: control
     if: >-
       github.event_name == 'push' ||
-      (github.event_name == 'schedule' && github.event.schedule == '0 0 * * 1-5') ||
-      (github.event_name == 'workflow_dispatch' && (inputs.run_mode == 'live' || inputs.run_mode == 'live_recovery'))
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'schedule' && github.event.schedule == '7 0 * * 1-5')
     runs-on: ubuntu-latest
     timeout-minutes: 150
     concurrency:
-      group: qts-a4-mis-production
+      group: qts-a4-mis-control
       cancel-in-progress: false
     env:
       TZ: Asia/Taipei
       OUTPUT_DIR: output/a4
       A4_STATUS_DIR: status/a4
       POLL_SECONDS: "30"
-      RUNTIME_AUDIT_SECONDS: "30"
-      RUNTIME_MAX_REPAIRS: "2"
-      RUNTIME_FAIL_CLOSED_WINDOWS: "3"
+      MIN_SYMBOL_COVERAGE: "0.995"
+      MAX_REQUEST_ERROR_RATE: "0.02"
+      MIN_PREOPEN_VALID_CYCLES: "0.95"
+      MIN_OPEN_VALID_CYCLES: "0.90"
+      MAX_CONSECUTIVE_INVALID_CYCLES: "2"
+      MAX_ALLOWED_GAP_SECONDS: "60"
       MIN_TWSE_SYMBOLS: "800"
       MIN_TPEX_SYMBOLS: "600"
       MIN_TOTAL_SYMBOLS: "1500"
       MAX_TOTAL_SYMBOLS: "3000"
-      PER_CYCLE_FRESH_COVERAGE: "0.97"
-      MIN_PREOPEN_VALID_CYCLES: "0.95"
-      MIN_OPEN_VALID_CYCLES: "0.90"
-      MIN_P05_SYMBOL_COVERAGE: "0.95"
-      MAX_CONSECUTIVE_INVALID_CYCLES: "2"
-      MAX_REQUEST_ERROR_RATE: "0.05"
-      MAX_ALLOWED_GAP_SECONDS: "60"
       DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
 
     steps:
@@ -69,114 +72,48 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Publish qualification start
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          python - <<'PY'
-          import base64,json,os,urllib.request
-          from datetime import datetime,timezone,timedelta
-          repo=os.environ['GITHUB_REPOSITORY']; branch=os.environ.get('DEFAULT_BRANCH','main'); token=os.environ['GITHUB_TOKEN']
-          path='status/a4/qualification_live.json'; api=f'https://api.github.com/repos/{repo}/contents/{path}'
-          headers={'Authorization':f'Bearer {token}','Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','User-Agent':'QTS-A4-Qualification'}
-          sha=None
-          try:
-              with urllib.request.urlopen(urllib.request.Request(api+f'?ref={branch}',headers=headers),timeout=15) as r: sha=json.load(r).get('sha')
-          except Exception: pass
-          tw=timezone(timedelta(hours=8)); obj={'component':'A4_001A','target_version':'V2.6.0','status':'QUALIFICATION_STARTED','run_id':os.environ.get('GITHUB_RUN_ID'),'started_at':datetime.now(tw).isoformat(timespec='seconds'),'rounds_required':3,'rounds_passed':0}
-          body={'message':f"A4 qualification started {obj['run_id']}",'content':base64.b64encode(json.dumps(obj,ensure_ascii=False,indent=2).encode()).decode(),'branch':branch}
-          if sha: body['sha']=sha
-          req=urllib.request.Request(api,data=json.dumps(body).encode(),headers={**headers,'Content-Type':'application/json'},method='PUT')
-          with urllib.request.urlopen(req,timeout=15): pass
-          print(json.dumps(obj,ensure_ascii=False))
-          PY
-
-      - name: Apply staged V2.6 sustainable transport patch
+      - name: Resolve control mode
+        id: mode
         shell: bash
         run: |
           set -euo pipefail
-          if ! grep -q 'A4_001A_COMPLETE_CONTROL_POINT_V2.6.0' A4_001A_CompleteControlPoint.py; then
-            test -f A4_V26_patch.py
-            python A4_V26_patch.py
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            MODE="${{ inputs.run_mode }}"
+          elif [ "${{ github.event_name }}" = "schedule" ]; then
+            MODE="live"
+          else
+            MODE=$(python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path("status/a4/live_trigger.json")
+          try:
+              x=json.loads(p.read_text(encoding="utf-8"))
+              print(str(x.get("run_mode") or "live"))
+          except Exception:
+              print("live")
+          PY
+          )
           fi
-          grep 'VERSION = "A4_001A_COMPLETE_CONTROL_POINT_V2.6.0"' A4_001A_CompleteControlPoint.py
-
-      - name: Static compile before network
-        run: python -m py_compile "A4_001A_CompleteControlPoint.py" "A4_001_TWSE_MIS盤前試撮抓取.py"
+          case "$MODE" in
+            selftest|env_test|qualify|live|live_recovery) ;;
+            *) echo "unsupported mode=$MODE"; exit 2 ;;
+          esac
+          echo "run_mode=$MODE" >> "$GITHUB_OUTPUT"
+          echo "A4 effective mode=$MODE"
 
       - name: Install runtime
         run: |
           python -m pip install --upgrade pip
           pip install pandas requests pyarrow
 
+      - name: Static compile
+        run: python -m py_compile "A4_001A_CompleteControlPoint.py" "A4_001_TWSE_MIS盤前試撮抓取.py"
+
       - name: Integrated selftest
         run: python "A4_001A_CompleteControlPoint.py" --mode selftest
 
-      - name: Three consecutive full-market transport probes
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          python - <<'PY'
-          import base64,json,os,subprocess,sys,time,urllib.request
-          from datetime import datetime,timezone,timedelta
-          from pathlib import Path
-
-          repo=os.environ['GITHUB_REPOSITORY']; branch=os.environ.get('DEFAULT_BRANCH','main'); token=os.environ['GITHUB_TOKEN']
-          path='status/a4/qualification_live.json'; api=f'https://api.github.com/repos/{repo}/contents/{path}'
-          headers={'Authorization':f'Bearer {token}','Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','User-Agent':'QTS-A4-Qualification'}
-          tw=timezone(timedelta(hours=8)); run_id=os.environ.get('GITHUB_RUN_ID')
-
-          def publish(obj):
-              sha=None
-              try:
-                  with urllib.request.urlopen(urllib.request.Request(api+f'?ref={branch}',headers=headers),timeout=15) as r: sha=json.load(r).get('sha')
-              except Exception: pass
-              body={'message':f"A4 qualification {run_id} {obj['status']}",'content':base64.b64encode(json.dumps(obj,ensure_ascii=False,indent=2).encode()).decode(),'branch':branch}
-              if sha: body['sha']=sha
-              req=urllib.request.Request(api,data=json.dumps(body).encode(),headers={**headers,'Content-Type':'application/json'},method='PUT')
-              with urllib.request.urlopen(req,timeout=15): pass
-
-          root=Path('output/a4_qualification'); root.mkdir(parents=True,exist_ok=True)
-          rounds=[]
-          for rnd in (1,2,3):
-              od=root/f'round_{rnd}'; od.mkdir(parents=True,exist_ok=True)
-              env=os.environ.copy(); env['OUTPUT_DIR']=str(od); env['A4_STATUS_DIR']='status/a4'; env['POLL_SECONDS']='30'; env['ENV_TEST_MIN_COVERAGE']='0.95'; env['ENV_TEST_MAX_ERROR_RATE']='0.05'; env.pop('GITHUB_TOKEN',None)
-              p=subprocess.run([sys.executable,'A4_001A_CompleteControlPoint.py','--mode','env_test'],env=env,text=True,capture_output=True,timeout=120)
-              (od/'stdout.log').write_text(p.stdout,encoding='utf-8'); (od/'stderr.log').write_text(p.stderr,encoding='utf-8')
-              rp=od/'env_test_report.json'
-              try: rep=json.loads(rp.read_text(encoding='utf-8')) if rp.exists() else {}
-              except Exception: rep={}
-              one={'round':rnd,'pass':bool(rep.get('pass')) and p.returncode==0,'returncode':p.returncode,'coverage':rep.get('coverage'),'requested_symbols':rep.get('requested_symbols'),'returned_symbols':rep.get('returned_symbols'),'request_attempts':rep.get('request_attempts'),'request_errors':rep.get('request_errors'),'request_error_rate':rep.get('request_error_rate'),'cycle_elapsed_seconds':rep.get('cycle_elapsed_seconds'),'cycle_budget_seconds':rep.get('cycle_budget_seconds'),'warmup_ok_count':rep.get('warmup_ok_count'),'warmup_total':rep.get('warmup_total'),'engine_returncode':rep.get('engine_returncode')}
-              rounds.append(one)
-              status='ROUND_PASS' if one['pass'] else 'ROUND_FAIL'
-              obj={'component':'A4_001A','version':'A4_001A_COMPLETE_CONTROL_POINT_V2.6.0','status':status,'run_id':run_id,'checked_at':datetime.now(tw).isoformat(timespec='seconds'),'rounds_required':3,'rounds_passed':sum(1 for x in rounds if x['pass']),'current_round':rnd,'rounds':rounds}
-              publish(obj); print(json.dumps(obj,ensure_ascii=False))
-              if not one['pass']:
-                  raise SystemExit(20+rnd)
-              if rnd<3: time.sleep(5)
-          obj={'component':'A4_001A','version':'A4_001A_COMPLETE_CONTROL_POINT_V2.6.0','status':'PASS_3X','run_id':run_id,'checked_at':datetime.now(tw).isoformat(timespec='seconds'),'rounds_required':3,'rounds_passed':3,'rounds':rounds}
-          publish(obj); print(json.dumps(obj,ensure_ascii=False))
-          PY
-
-      - name: Persist V2.6 controller source
-        continue-on-error: true
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add A4_001A_CompleteControlPoint.py
-          if git diff --cached --quiet; then exit 0; fi
-          git commit -m "A4 V2.6 sustainable full-market transport"
-          for attempt in 1 2 3 4 5; do
-            if git push origin HEAD:"$DEFAULT_BRANCH"; then exit 0; fi
-            if [ "$attempt" -eq 5 ]; then exit 1; fi
-            git fetch origin "$DEFAULT_BRANCH"; git rebase "origin/$DEFAULT_BRANCH"; sleep $((attempt*2))
-          done
-
       - name: Publish live runner start evidence
+        if: steps.mode.outputs.run_mode == 'live' || steps.mode.outputs.run_mode == 'live_recovery'
         env:
           GITHUB_TOKEN: ${{ github.token }}
         shell: bash
@@ -184,33 +121,49 @@ jobs:
           python - <<'PY'
           import base64,json,os,urllib.request
           from datetime import datetime,timezone,timedelta
-          repo=os.environ['GITHUB_REPOSITORY']; branch=os.environ.get('DEFAULT_BRANCH','main'); token=os.environ['GITHUB_TOKEN']; path='status/a4/runner_live.json'; api=f'https://api.github.com/repos/{repo}/contents/{path}'
-          headers={'Authorization':f'Bearer {token}','Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','User-Agent':'QTS-A4-Runner'}; sha=None
+          repo=os.environ["GITHUB_REPOSITORY"]
+          branch=os.environ.get("DEFAULT_BRANCH","main")
+          token=os.environ["GITHUB_TOKEN"]
+          path="status/a4/runner_live.json"
+          api=f"https://api.github.com/repos/{repo}/contents/{path}"
+          headers={"Authorization":f"Bearer {token}","Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28","User-Agent":"QTS-A4-V3"}
+          sha=None
           try:
-              with urllib.request.urlopen(urllib.request.Request(api+f'?ref={branch}',headers=headers),timeout=15) as r: sha=json.load(r).get('sha')
-          except Exception: pass
-          tw=timezone(timedelta(hours=8)); obj={'component':'A4_001A','status':'RUNNER_STARTED','version':'A4_001A_COMPLETE_CONTROL_POINT_V2.6.0','date':datetime.now(tw).date().isoformat(),'started_at':datetime.now(tw).isoformat(timespec='seconds'),'run_id':os.environ.get('GITHUB_RUN_ID'),'run_attempt':os.environ.get('GITHUB_RUN_ATTEMPT'),'event_name':os.environ.get('GITHUB_EVENT_NAME'),'source_commit':os.environ.get('GITHUB_SHA')}
-          body={'message':f"A4 runner started {obj['run_id']} V2.6.0",'content':base64.b64encode(json.dumps(obj,ensure_ascii=False,indent=2).encode()).decode(),'branch':branch}
-          if sha: body['sha']=sha
-          with urllib.request.urlopen(urllib.request.Request(api,data=json.dumps(body).encode(),headers={**headers,'Content-Type':'application/json'},method='PUT'),timeout=15): pass
+              with urllib.request.urlopen(urllib.request.Request(api+f"?ref={branch}",headers=headers),timeout=15) as r:
+                  sha=json.load(r).get("sha")
+          except Exception:
+              pass
+          tw=timezone(timedelta(hours=8))
+          obj={"component":"A4_001A","status":"RUNNER_STARTED","version":"A4_001A_COMPLETE_CONTROL_POINT_V3.0.0","date":datetime.now(tw).date().isoformat(),"started_at":datetime.now(tw).isoformat(timespec="seconds"),"run_id":os.environ.get("GITHUB_RUN_ID"),"run_attempt":os.environ.get("GITHUB_RUN_ATTEMPT"),"event_name":os.environ.get("GITHUB_EVENT_NAME"),"source_commit":os.environ.get("GITHUB_SHA")}
+          body={"message":f"A4 V3 runner started {obj['run_id']}","content":base64.b64encode(json.dumps(obj,ensure_ascii=False,indent=2).encode()).decode(),"branch":branch}
+          if sha: body["sha"]=sha
+          req=urllib.request.Request(api,data=json.dumps(body).encode(),headers={**headers,"Content-Type":"application/json"},method="PUT")
+          with urllib.request.urlopen(req,timeout=15): pass
           print(json.dumps(obj,ensure_ascii=False))
           PY
 
-      - name: Run complete production control point
+      - name: Run selected complete control point
         id: control
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: python "A4_001A_CompleteControlPoint.py" --mode live
+        shell: bash
+        run: |
+          set -euo pipefail
+          MODE="${{ steps.mode.outputs.run_mode }}"
+          case "$MODE" in
+            selftest) python "A4_001A_CompleteControlPoint.py" --mode selftest ;;
+            env_test) python "A4_001A_CompleteControlPoint.py" --mode env_test ;;
+            qualify) python "A4_001A_CompleteControlPoint.py" --mode qualify ;;
+            live|live_recovery) python "A4_001A_CompleteControlPoint.py" --mode live ;;
+          esac
 
       - name: Upload complete evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: qts-a4-complete-${{ github.run_id }}
-          path: |
-            output/a4/
-            output/a4_qualification/
+          name: qts-a4-v3-${{ github.run_id }}
+          path: output/a4/
           if-no-files-found: warn
           retention-days: 90
           compression-level: 6
@@ -220,27 +173,41 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          DATE_TW=$(TZ=Asia/Taipei date +%F); RUN_FILE="status/a4/${DATE_TW}_${GITHUB_RUN_ID}.json"; COMPLETED_FILE="status/a4/${DATE_TW}_COMPLETED.json"; TMP_DIR=$(mktemp -d); mkdir -p "$TMP_DIR/status/a4"
-          for f in status/a4/latest.json "$RUN_FILE" "$COMPLETED_FILE"; do if [ -f "$f" ]; then cp "$f" "$TMP_DIR/status/a4/$(basename "$f")"; fi; done
-          git fetch origin "$DEFAULT_BRANCH"; git reset --hard "origin/$DEFAULT_BRANCH"; mkdir -p status/a4; cp -f "$TMP_DIR"/status/a4/* status/a4/ 2>/dev/null || true
-          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add status/a4/latest.json "$RUN_FILE" 2>/dev/null || true; if [ -f "$COMPLETED_FILE" ]; then git add "$COMPLETED_FILE"; fi
+          DATE_TW=$(TZ=Asia/Taipei date +%F)
+          TMP_DIR=$(mktemp -d)
+          mkdir -p "$TMP_DIR/status/a4"
+          for f in status/a4/latest.json status/a4/qualification_latest.json status/a4/runner_live.json "status/a4/${DATE_TW}_${GITHUB_RUN_ID}.json" "status/a4/${DATE_TW}_COMPLETED.json"; do
+            if [ -f "$f" ]; then cp "$f" "$TMP_DIR/status/a4/$(basename "$f")"; fi
+          done
+          git fetch origin "$DEFAULT_BRANCH"
+          git reset --hard "origin/$DEFAULT_BRANCH"
+          mkdir -p status/a4
+          cp -f "$TMP_DIR"/status/a4/* status/a4/ 2>/dev/null || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add status/a4/*.json 2>/dev/null || true
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m "A4 complete status ${DATE_TW} run ${GITHUB_RUN_ID}"
-          for attempt in 1 2 3 4 5; do if git push origin "$DEFAULT_BRANCH"; then exit 0; fi; if [ "$attempt" -eq 5 ]; then exit 1; fi; git fetch origin "$DEFAULT_BRANCH"; git rebase "origin/$DEFAULT_BRANCH"; sleep $((attempt*2)); done
+          git commit -m "A4 V3 evidence ${DATE_TW} run ${GITHUB_RUN_ID}"
+          for attempt in 1 2 3 4 5; do
+            if git push origin "$DEFAULT_BRANCH"; then exit 0; fi
+            if [ "$attempt" -eq 5 ]; then exit 1; fi
+            git fetch origin "$DEFAULT_BRANCH"
+            git rebase "origin/$DEFAULT_BRANCH"
+            sleep $((attempt * 2))
+          done
 
-      - name: Enforce complete control point result
+      - name: Enforce result
         if: always()
         run: |
           if [ "${{ steps.control.outcome }}" != "success" ]; then exit 1; fi
 
-  watchdog:
-    name: watchdog
-    if: github.event_name == 'schedule' && github.event.schedule == '15 0 * * 1-5'
+  watchdog_first:
+    name: watchdog_first
+    if: github.event_name == 'schedule' && github.event.schedule == '17 0 * * 1-5'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
     concurrency:
-      group: qts-a4-watchdog
+      group: qts-a4-watchdog-first
       cancel-in-progress: false
     env:
       TZ: Asia/Taipei
@@ -258,41 +225,34 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - name: Apply V2.6 if required
-        run: if ! grep -q 'A4_001A_COMPLETE_CONTROL_POINT_V2.6.0' A4_001A_CompleteControlPoint.py; then python A4_V26_patch.py; fi
-      - name: Install runtime
-        run: pip install pandas requests pyarrow
-      - name: Compile and selftest
-        run: |
-          python -m py_compile "A4_001A_CompleteControlPoint.py" "A4_001_TWSE_MIS盤前試撮抓取.py"
-          python "A4_001A_CompleteControlPoint.py" --mode selftest
-      - name: Run integrated watchdog
-        run: python "A4_001A_CompleteControlPoint.py" --mode watchdog --watchdog-stage final
+      - run: pip install pandas requests pyarrow
+      - run: python -m py_compile "A4_001A_CompleteControlPoint.py" "A4_001_TWSE_MIS盤前試撮抓取.py"
+      - run: python "A4_001A_CompleteControlPoint.py" --mode watchdog --watchdog-stage first
 
-  diagnostics:
-    name: diagnostics
-    if: github.event_name == 'workflow_dispatch' && (inputs.run_mode == 'selftest' || inputs.run_mode == 'env_test')
+  watchdog_final:
+    name: watchdog_final
+    if: github.event_name == 'schedule' && github.event.schedule == '22 0 * * 1-5'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
+    concurrency:
+      group: qts-a4-watchdog-final
+      cancel-in-progress: false
     env:
       TZ: Asia/Taipei
-      OUTPUT_DIR: output/a4_validation
+      OUTPUT_DIR: output/a4
       A4_STATUS_DIR: status/a4
       POLL_SECONDS: "30"
-      ENV_TEST_MIN_COVERAGE: "0.95"
-      ENV_TEST_MAX_ERROR_RATE: "0.05"
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      A4_WORKFLOW_FILE: scraper.yml
+      GITHUB_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 1
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - name: Apply V2.6 if required
-        run: if ! grep -q 'A4_001A_COMPLETE_CONTROL_POINT_V2.6.0' A4_001A_CompleteControlPoint.py; then python A4_V26_patch.py; fi
-      - name: Install runtime
-        run: pip install pandas requests pyarrow
-      - name: Compile and run diagnostics
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          python -m py_compile "A4_001A_CompleteControlPoint.py" "A4_001_TWSE_MIS盤前試撮抓取.py"
-          python "A4_001A_CompleteControlPoint.py" --mode "${{ inputs.run_mode }}"
+      - run: pip install pandas requests pyarrow
+      - run: python -m py_compile "A4_001A_CompleteControlPoint.py" "A4_001_TWSE_MIS盤前試撮抓取.py"
+      - run: python "A4_001A_CompleteControlPoint.py" --mode watchdog --watchdog-stage final
