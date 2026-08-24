@@ -1,8 +1,9 @@
 {
   "component": "A4_001A",
-  "status": "LIVE_TRIGGER_REQUESTED",
-  "date": "2026-08-21",
-  "requested_at": "2026-08-21T09:20:00+08:00",
-  "requested_by": "ChatGPT_A4_V26_Qualification",
-  "reason": "RUN_VISIBLE_FAIL_FAST_3X_QUALIFICATION_THEN_LIVE"
+  "status": "QUALIFICATION_TRIGGER_REQUESTED",
+  "run_mode": "qualify",
+  "date": "2026-08-24",
+  "requested_at": "2026-08-24T16:08:00+08:00",
+  "requested_by": "ChatGPT_A4_V3",
+  "reason": "THREE_CONSECUTIVE_FULL_MARKET_TRANSPORT_PROBES_AFTER_V3_REDESIGN"
 }
