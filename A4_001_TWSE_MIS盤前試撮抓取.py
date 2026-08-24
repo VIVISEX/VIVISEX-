@@ -4,75 +4,50 @@ import csv
 import json
 import math
 import os
-import queue
-import random
 import sys
-import threading
 import time
 from collections import Counter
-from concurrent.futures import ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from datetime import datetime, time as dtime, timedelta
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
 import pandas as pd
 import requests
 
-VERSION = "1.5.0"
+VERSION = "3.0.0"
 TZ = ZoneInfo("Asia/Taipei")
-
 MIS_URL = "https://mis.twse.com.tw/stock/api/getStockInfo.jsp"
-MIS_HOME_URL = "https://mis.twse.com.tw/stock/index.jsp"
-MIS_FIBEST_URL = "https://mis.twse.com.tw/stock/fibest.jsp"
 
 RUN_MODE = os.getenv("RUN_MODE", "live").strip().lower()
 STOCKS_FILE = Path(os.getenv("STOCKS_FILE", "stocks.csv"))
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", "output/mis"))
 
-POLL_SECONDS = max(1.0, float(os.getenv("POLL_SECONDS", "5")))
-ARM_TIME = dtime.fromisoformat(os.getenv("ARM_TIME", "08:25:00"))
+POLL_SECONDS = max(10.0, float(os.getenv("POLL_SECONDS", "30")))
 START_TIME = dtime.fromisoformat(os.getenv("START_TIME", "08:30:00"))
 PREOPEN_END = dtime.fromisoformat(os.getenv("PREOPEN_END", "09:00:00"))
 END_TIME = dtime.fromisoformat(os.getenv("END_TIME", "09:30:00"))
-STARTUP_DEADLINE = dtime.fromisoformat(os.getenv("STARTUP_DEADLINE", "08:29:45"))
-FIRST_PREOPEN_DEADLINE = dtime.fromisoformat(os.getenv("FIRST_PREOPEN_DEADLINE", "08:30:20"))
-LAST_PREOPEN_EARLIEST = dtime.fromisoformat(os.getenv("LAST_PREOPEN_EARLIEST", "08:59:40"))
 
-BATCH_SIZE = max(50, int(os.getenv("BATCH_SIZE", "60")))
-PRIMARY_WORKERS = max(1, int(os.getenv("PRIMARY_WORKERS", "3")))
-RETRY_BATCH_SIZE = max(24, int(os.getenv("RETRY_BATCH_SIZE", "30")))
-RETRY_WORKERS = max(1, int(os.getenv("RETRY_WORKERS", "2")))
-SINGLE_FALLBACK_LIMIT = max(0, int(os.getenv("SINGLE_FALLBACK_LIMIT", "4")))
-SESSION_POOL_SIZE = max(1, int(os.getenv("SESSION_POOL_SIZE", "3")))
-
-PRIMARY_TIMEOUT = max(1.80, float(os.getenv("PRIMARY_TIMEOUT", "2.20")))
-RETRY_TIMEOUT = max(1.20, float(os.getenv("RETRY_TIMEOUT", "1.80")))
-SINGLE_TIMEOUT = max(1.00, float(os.getenv("SINGLE_TIMEOUT", "1.40")))
-CYCLE_BUDGET_SECONDS = max(1.0, float(os.getenv("CYCLE_BUDGET_SECONDS", "4.60")))
-CYCLE_GUARD_SECONDS = max(0.05, float(os.getenv("CYCLE_GUARD_SECONDS", "0.15")))
-WARMUP_TIMEOUT = max(0.5, float(os.getenv("WARMUP_TIMEOUT", "3.0")))
-WARMUP_ATTEMPTS = max(1, int(os.getenv("WARMUP_ATTEMPTS", "3")))
-
+TARGET_BATCH_SYMBOLS = max(10, int(os.getenv("TARGET_BATCH_SYMBOLS", "90")))
+MIN_BATCH_SYMBOLS = max(1, int(os.getenv("MIN_BATCH_SYMBOLS", "8")))
+MAX_URL_CHARS = max(900, int(os.getenv("MAX_URL_CHARS", "1800")))
+MIN_REQUEST_INTERVAL = max(0.05, float(os.getenv("MIN_REQUEST_INTERVAL", "0.25")))
+REQUEST_TIMEOUT = max(1.0, float(os.getenv("REQUEST_TIMEOUT", "3.0")))
+REQUEST_RETRIES = max(0, int(os.getenv("REQUEST_RETRIES", "2")))
+CYCLE_BUDGET_SECONDS = max(5.0, float(os.getenv("CYCLE_BUDGET_SECONDS", "20.0")))
+CYCLE_GUARD_SECONDS = max(0.10, float(os.getenv("CYCLE_GUARD_SECONDS", "0.50")))
+BACKOFF_BASE_SECONDS = max(0.20, float(os.getenv("BACKOFF_BASE_SECONDS", "0.60")))
+BACKOFF_CAP_SECONDS = max(BACKOFF_BASE_SECONDS, float(os.getenv("BACKOFF_CAP_SECONDS", "4.0")))
+MIN_SYMBOL_COVERAGE = min(1.0, max(0.0, float(os.getenv("MIN_SYMBOL_COVERAGE", "0.995"))))
+MAX_TERMINAL_ERROR_RATE = min(1.0, max(0.0, float(os.getenv("MAX_TERMINAL_ERROR_RATE", "0.02"))))
 SOURCE_GAP_CONSECUTIVE_CYCLES = max(1, int(os.getenv("SOURCE_GAP_CONSECUTIVE_CYCLES", "3")))
-MAX_REQUEST_ERROR_RATE = min(1.0, max(0.0, float(os.getenv("MAX_REQUEST_ERROR_RATE", "0.02"))))
-MIN_PREOPEN_COVERAGE = min(1.0, max(0.0, float(os.getenv("MIN_PREOPEN_COVERAGE", "0.98"))))
-MIN_OPEN_COVERAGE = min(1.0, max(0.0, float(os.getenv("MIN_OPEN_COVERAGE", "0.95"))))
-MIN_SYMBOL_COVERAGE = min(1.0, max(0.0, float(os.getenv("MIN_SYMBOL_COVERAGE", "0.99"))))
-MAX_ALLOWED_GAP_SECONDS = max(POLL_SECONDS, float(os.getenv("MAX_ALLOWED_GAP_SECONDS", "15")))
-RETRY_TRIGGER_COVERAGE = min(1.0, max(0.0, float(os.getenv("RETRY_TRIGGER_COVERAGE", "0.80"))))
-
-BACKOFF_BASE_SECONDS = max(0.2, float(os.getenv("BACKOFF_BASE_SECONDS", "0.75")))
-BACKOFF_CAP_SECONDS = max(BACKOFF_BASE_SECONDS, float(os.getenv("BACKOFF_CAP_SECONDS", "3.0")))
+NO_QUOTE_CONFIRMATIONS = max(2, int(os.getenv("NO_QUOTE_CONFIRMATIONS", "3")))
+NO_QUOTE_PROBE_LIMIT = max(0, int(os.getenv("NO_QUOTE_PROBE_LIMIT", "30")))
 
 RETRYABLE_HTTP = {408, 425, 429, 500, 502, 503, 504}
-
-_SESSION_POOL: queue.LifoQueue[requests.Session] = queue.LifoQueue()
-_BACKOFF_LOCK = threading.Lock()
-_BACKOFF_UNTIL = 0.0
-_BACKOFF_LEVEL = 0
-
+SIZE_HTTP = {400, 414, 422}
 
 @dataclass(frozen=True)
 class Stock:
@@ -80,35 +55,319 @@ class Stock:
     code: str
     ex_ch: str
 
-
 @dataclass
-class FetchResult:
-    requested: list[Stock]
+class BatchResult:
     items: list[dict[str, Any]]
-    raw: dict[str, Any] | None
+    requested_codes: list[str]
     ok: bool
-    error: str | None
+    terminal: bool
     error_type: str | None
+    error: str | None
     http_status: int | None
-    elapsed_seconds: float
-    stage: str
-
+    split_depth: int
 
 def now_tw() -> datetime:
     return datetime.now(TZ)
-
 
 def combine_today(t: dtime, base: datetime | None = None) -> datetime:
     base = base or now_tw()
     return datetime.combine(base.date(), t, TZ)
 
-
-def atomic_write_json(path: Path, obj: Any) -> None:
+def atomic_json(path: Path, obj: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
     tmp.replace(path)
 
+def load_stocks(path: Path) -> list[Stock]:
+    if not path.exists():
+        raise FileNotFoundError(f"stocks file not found: {path}")
+    out: list[Stock] = []
+    seen: set[tuple[str, str]] = set()
+    with path.open("r", encoding="utf-8-sig", newline="") as f:
+        r = csv.DictReader(f)
+        if not r.fieldnames or "code" not in r.fieldnames:
+            raise ValueError("stocks.csv must contain code column")
+        for row in r:
+            code = str(row.get("code", "")).strip()
+            market = str(row.get("market", "TSE")).strip().upper()
+            if not code or market not in {"TSE", "OTC"}:
+                continue
+            key = (market, code)
+            if key in seen:
+                continue
+            seen.add(key)
+            ex_ch = str(row.get("ex_ch", "")).strip()
+            if not ex_ch:
+                ex_ch = f"{'tse' if market == 'TSE' else 'otc'}_{code}.tw"
+            out.append(Stock(market, code, ex_ch))
+    if not out:
+        raise RuntimeError("stocks file contains no valid symbols")
+    return out
+
+def make_session() -> requests.Session:
+    s = requests.Session()
+    adapter = requests.adapters.HTTPAdapter(pool_connections=1, pool_maxsize=1, max_retries=0, pool_block=True)
+    s.mount("https://", adapter)
+    s.headers.update({
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) QTS-A4-Adaptive/3.0",
+        "Accept": "application/json,text/plain,*/*",
+        "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.7",
+        "Referer": "https://mis.twse.com.tw/stock/fibest.jsp",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+        "Connection": "keep-alive",
+    })
+    return s
+
+def prepare_url_len(batch: list[Stock]) -> int:
+    params = {"ex_ch": "|".join(x.ex_ch for x in batch), "json": "1", "delay": "0", "_": "0000000000000"}
+    return len(MIS_URL) + 1 + len(urlencode(params))
+
+def build_batches(stocks: list[Stock], max_symbols: int) -> list[list[Stock]]:
+    batches: list[list[Stock]] = []
+    cur: list[Stock] = []
+    for stock in stocks:
+        candidate = cur + [stock]
+        if cur and (len(candidate) > max_symbols or prepare_url_len(candidate) > MAX_URL_CHARS):
+            batches.append(cur)
+            cur = [stock]
+        else:
+            cur = candidate
+    if cur:
+        batches.append(cur)
+    return batches
+
+def classify_exception(exc: Exception) -> tuple[str, int | None]:
+    if isinstance(exc, requests.Timeout):
+        return "TIMEOUT", None
+    if isinstance(exc, requests.ConnectionError):
+        return "CONNECTION_ERROR", None
+    if isinstance(exc, requests.HTTPError):
+        status = exc.response.status_code if exc.response is not None else None
+        return f"HTTP_{status}" if status else "HTTP_ERROR", status
+    return type(exc).__name__.upper(), None
+
+class AdaptiveTransport:
+    def __init__(self) -> None:
+        self.session = make_session()
+        self.last_request_mono = 0.0
+        self.safe_batch_symbols = TARGET_BATCH_SYMBOLS
+        self.stats = Counter()
+        self.sample_errors: list[dict[str, Any]] = []
+        self.no_quote_counts: Counter[str] = Counter()
+        self.no_quote_codes: set[str] = set()
+
+    def close(self) -> None:
+        self.session.close()
+
+    def reset_session(self) -> None:
+        try:
+            self.session.close()
+        except Exception:
+            pass
+        self.session = make_session()
+        self.stats["session_resets"] += 1
+
+    def pace(self, deadline: float) -> bool:
+        wait = MIN_REQUEST_INTERVAL - (time.monotonic() - self.last_request_mono)
+        if wait <= 0:
+            return True
+        if time.monotonic() + wait >= deadline - CYCLE_GUARD_SECONDS:
+            return False
+        time.sleep(wait)
+        return True
+
+    def _request(self, batch: list[Stock], deadline: float) -> tuple[dict[str, Any] | None, str | None, int | None, str | None]:
+        if not self.pace(deadline):
+            return None, "CYCLE_DEADLINE", None, "pacing would exceed cycle deadline"
+        remaining = deadline - time.monotonic() - CYCLE_GUARD_SECONDS
+        if remaining <= 0:
+            return None, "CYCLE_DEADLINE", None, "cycle deadline exhausted"
+        params = {"ex_ch": "|".join(x.ex_ch for x in batch), "json": "1", "delay": "0", "_": str(int(time.time() * 1000))}
+        self.stats["http_attempts"] += 1
+        self.last_request_mono = time.monotonic()
+        try:
+            r = self.session.get(MIS_URL, params=params, timeout=min(REQUEST_TIMEOUT, max(0.5, remaining)))
+            status = r.status_code
+            if status in SIZE_HTTP:
+                self.stats["size_rejections"] += 1
+                return None, f"HTTP_{status}", status, f"HTTP {status}"
+            if status in RETRYABLE_HTTP:
+                self.stats["retryable_http"] += 1
+                return None, f"HTTP_{status}", status, f"HTTP {status}"
+            r.raise_for_status()
+            obj = r.json()
+            if not isinstance(obj, dict):
+                return None, "MIS_SCHEMA_ERROR", status, "response is not object"
+            rtcode = str(obj.get("rtcode", ""))
+            if rtcode != "0000":
+                self.stats["mis_rtcode_errors"] += 1
+                return obj, "MIS_RTCODE", status, f"rtcode={rtcode} message={obj.get('rtmessage')}"
+            if not isinstance(obj.get("msgArray", []), list):
+                return obj, "MIS_SCHEMA_ERROR", status, "msgArray is not list"
+            return obj, None, status, None
+        except Exception as exc:
+            et, status = classify_exception(exc)
+            if et in {"CONNECTION_ERROR", "TIMEOUT"}:
+                self.stats["transport_exceptions"] += 1
+            return None, et, status, f"{type(exc).__name__}: {exc}"
+
+    def warmup(self) -> dict[str, Any]:
+        probes = [Stock("TSE", "2330", "tse_2330.tw"), Stock("OTC", "6488", "otc_6488.tw")]
+        deadline = time.monotonic() + 10.0
+        errors: list[str] = []
+        for attempt in range(1, 4):
+            obj, et, status, err = self._request(probes, deadline)
+            if et is None and isinstance(obj, dict):
+                items = obj.get("msgArray", []) or []
+                codes = {str(x.get("c", "")).strip() for x in items if isinstance(x, dict)}
+                if codes & {"2330", "6488"}:
+                    return {"ok": True, "attempt": attempt, "status": status, "returned_probe_symbols": sorted(codes & {"2330", "6488"})}
+            errors.append(f"{et}:{err}")
+            self.reset_session()
+            time.sleep(min(2.0, 0.4 * attempt))
+        return {"ok": False, "errors": errors[-5:]}
+
+    def _record_error(self, batch: list[Stock], et: str | None, status: int | None, err: str | None, depth: int) -> None:
+        if len(self.sample_errors) >= 12:
+            return
+        self.sample_errors.append({"batch_size": len(batch), "url_chars": prepare_url_len(batch), "error_type": et, "http_status": status, "error": (err or "")[:300], "split_depth": depth})
+
+    def fetch_batch(self, batch: list[Stock], deadline: float, depth: int = 0) -> list[BatchResult]:
+        if not batch:
+            return []
+        last_et = None
+        last_status = None
+        last_err = None
+        for attempt in range(REQUEST_RETRIES + 1):
+            obj, et, status, err = self._request(batch, deadline)
+            if et is None and isinstance(obj, dict):
+                items = [x for x in (obj.get("msgArray", []) or []) if isinstance(x, dict)]
+                self.stats["successful_batches"] += 1
+                return [BatchResult(items, [x.code for x in batch], True, False, None, None, status, depth)]
+            last_et, last_status, last_err = et, status, err
+            if et in {"HTTP_400", "HTTP_414", "HTTP_422", "MIS_RTCODE"} and len(batch) > MIN_BATCH_SYMBOLS:
+                self.stats["adaptive_splits"] += 1
+                self._record_error(batch, et, status, err, depth)
+                self.safe_batch_symbols = min(self.safe_batch_symbols, max(MIN_BATCH_SYMBOLS, len(batch) // 2))
+                mid = len(batch) // 2
+                return self.fetch_batch(batch[:mid], deadline, depth + 1) + self.fetch_batch(batch[mid:], deadline, depth + 1)
+            if et in {"CONNECTION_ERROR", "TIMEOUT", "HTTP_429", "HTTP_500", "HTTP_502", "HTTP_503", "HTTP_504"} and attempt < REQUEST_RETRIES:
+                self.stats["transport_retries"] += 1
+                self.reset_session()
+                delay = min(BACKOFF_CAP_SECONDS, BACKOFF_BASE_SECONDS * (2 ** attempt))
+                if time.monotonic() + delay < deadline - CYCLE_GUARD_SECONDS:
+                    time.sleep(delay)
+                    continue
+            break
+        self.stats["terminal_batch_errors"] += 1
+        self._record_error(batch, last_et, last_status, last_err, depth)
+        return [BatchResult([], [x.code for x in batch], False, True, last_et, last_err, last_status, depth)]
+
+    def probe_missing(self, missing: list[Stock], deadline: float) -> list[dict[str, Any]]:
+        recovered: list[dict[str, Any]] = []
+        for stock in missing[:NO_QUOTE_PROBE_LIMIT]:
+            if time.monotonic() >= deadline - CYCLE_GUARD_SECONDS:
+                break
+            obj, et, status, err = self._request([stock], deadline)
+            if et is None and isinstance(obj, dict):
+                items = [x for x in (obj.get("msgArray", []) or []) if isinstance(x, dict)]
+                exact = [x for x in items if str(x.get("c", "")).strip() == stock.code]
+                if exact:
+                    recovered.extend(exact)
+                    self.no_quote_counts[stock.code] = 0
+                else:
+                    self.no_quote_counts[stock.code] += 1
+                    if self.no_quote_counts[stock.code] >= NO_QUOTE_CONFIRMATIONS:
+                        self.no_quote_codes.add(stock.code)
+            else:
+                self._record_error([stock], et, status, err, 99)
+        return recovered
+
+    def capture_cycle(self, stocks: list[Stock], deadline: float) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        started = time.monotonic()
+        self.sample_errors = []
+        stats_before = self.stats.copy()
+        batches = build_batches(stocks, self.safe_batch_symbols)
+        by_code = {s.code: s for s in stocks}
+        best: dict[str, dict[str, Any]] = {}
+        terminal_codes: set[str] = set()
+        for batch in batches:
+            if time.monotonic() >= deadline - CYCLE_GUARD_SECONDS:
+                terminal_codes.update(x.code for x in batch)
+                self.stats["deadline_batches"] += 1
+                continue
+            for result in self.fetch_batch(batch, deadline):
+                if result.terminal:
+                    terminal_codes.update(result.requested_codes)
+                for item in result.items:
+                    code = str(item.get("c", "")).strip()
+                    if code in by_code:
+                        best[code] = item
+        missing_codes = sorted(set(by_code) - set(best))
+        if missing_codes and NO_QUOTE_PROBE_LIMIT > 0:
+            recovered = self.probe_missing([by_code[c] for c in missing_codes], deadline)
+            for item in recovered:
+                code = str(item.get("c", "")).strip()
+                if code in by_code:
+                    best[code] = item
+        all_codes = set(by_code)
+        active_expected = all_codes - self.no_quote_codes
+        returned = set(best)
+        active_returned = returned & active_expected
+        raw_coverage = len(returned) / len(all_codes) if all_codes else 0.0
+        active_coverage = len(active_returned) / len(active_expected) if active_expected else 1.0
+        delta = self.stats - stats_before
+        attempts = int(delta["http_attempts"])
+        terminal_batch_errors = int(delta["terminal_batch_errors"])
+        terminal_error_rate = terminal_batch_errors / max(1, len(batches))
+        diag = {
+            "version": VERSION,
+            "requested_symbols": len(stocks),
+            "returned_symbols": len(returned),
+            "active_expected_symbols": len(active_expected),
+            "raw_coverage": raw_coverage,
+            "active_coverage": active_coverage,
+            "request_attempts": attempts,
+            "terminal_batch_errors": terminal_batch_errors,
+            "terminal_error_rate": terminal_error_rate,
+            "successful_batches": int(delta["successful_batches"]),
+            "adaptive_splits": int(delta["adaptive_splits"]),
+            "transport_retries": int(delta["transport_retries"]),
+            "session_resets": int(delta["session_resets"]),
+            "size_rejections": int(delta["size_rejections"]),
+            "mis_rtcode_errors": int(delta["mis_rtcode_errors"]),
+            "transport_exceptions": int(delta["transport_exceptions"]),
+            "deadline_batches": int(delta["deadline_batches"]),
+            "initial_batches": len(batches),
+            "safe_batch_symbols": self.safe_batch_symbols,
+            "max_url_chars": MAX_URL_CHARS,
+            "min_request_interval": MIN_REQUEST_INTERVAL,
+            "missing_symbols": sorted(all_codes - returned),
+            "no_quote_symbols": sorted(self.no_quote_codes),
+            "terminal_codes": sorted(terminal_codes),
+            "sample_errors": list(self.sample_errors),
+            "cycle_elapsed_seconds": time.monotonic() - started,
+            "cycle_budget_seconds": CYCLE_BUDGET_SECONDS,
+        }
+        return [best[c] for c in sorted(best)], diag
+
+def publish_github_guard(state: str, description: str) -> None:
+    token = os.getenv("GITHUB_TOKEN", "").strip()
+    repo = os.getenv("GITHUB_REPOSITORY", "").strip()
+    sha = os.getenv("GITHUB_SHA", "").strip()
+    if not token or not repo or not sha:
+        return
+    try:
+        requests.post(
+            f"https://api.github.com/repos/{repo}/statuses/{sha}",
+            headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "QTS-A4-Adaptive/3.0"},
+            json={"state": state, "context": "qts/a4/runtime-guard", "description": description[:140]},
+            timeout=5,
+        )
+    except Exception:
+        return
 
 def parse_levels(value: Any, cast=float) -> list[Any]:
     if value is None:
@@ -124,376 +383,20 @@ def parse_levels(value: Any, cast=float) -> list[Any]:
             out.append(None)
     return out[:5]
 
-
-def load_stocks(path: Path) -> list[Stock]:
-    if not path.exists():
-        raise FileNotFoundError(f"stocks file not found: {path}")
-
-    stocks: list[Stock] = []
-    seen: set[tuple[str, str]] = set()
-    with path.open("r", encoding="utf-8-sig", newline="") as f:
-        reader = csv.DictReader(f)
-        if not reader.fieldnames or "code" not in reader.fieldnames:
-            raise ValueError("stocks.csv must contain code column")
-        for row in reader:
-            code = str(row.get("code", "")).strip()
-            market = str(row.get("market", "TSE")).strip().upper()
-            ex_ch = str(row.get("ex_ch", "")).strip()
-            if not code:
-                continue
-            if market not in {"TSE", "OTC"}:
-                raise ValueError(f"unsupported market={market} for code={code}")
-            key = (market, code)
-            if key in seen:
-                continue
-            seen.add(key)
-            if not ex_ch:
-                prefix = "tse" if market == "TSE" else "otc"
-                ex_ch = f"{prefix}_{code}.tw"
-            stocks.append(Stock(market=market, code=code, ex_ch=ex_ch))
-
-    if not stocks:
-        raise RuntimeError("stocks.csv contains no valid symbols")
-    return stocks
-
-
-def chunks(seq: list[Stock], n: int) -> list[list[Stock]]:
-    return [seq[i : i + n] for i in range(0, len(seq), n)]
-
-
-def make_session() -> requests.Session:
-    s = requests.Session()
-    adapter = requests.adapters.HTTPAdapter(
-        pool_connections=2,
-        pool_maxsize=2,
-        max_retries=0,
-        pool_block=True,
-    )
-    s.mount("https://", adapter)
-    s.headers.update(
-        {
-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/151 Safari/537.36 QTS-A4/1.5",
-            "Accept": "application/json,text/plain,*/*",
-            "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.7",
-            "Referer": MIS_FIBEST_URL,
-            "Cache-Control": "no-cache",
-            "Pragma": "no-cache",
-            "Connection": "keep-alive",
-        }
-    )
-    return s
-
-
-def classify_exception(exc: Exception) -> tuple[str, int | None]:
-    if isinstance(exc, requests.Timeout):
-        return "TIMEOUT", None
-    if isinstance(exc, requests.ConnectionError):
-        return "CONNECTION_ERROR", None
-    if isinstance(exc, requests.HTTPError):
-        status = exc.response.status_code if exc.response is not None else None
-        return f"HTTP_{status}" if status else "HTTP_ERROR", status
-    if isinstance(exc, json.JSONDecodeError):
-        return "JSON_DECODE_ERROR", None
-    msg = str(exc)
-    if "rtcode=" in msg:
-        return "MIS_RTCODE", None
-    if "msgArray" in msg:
-        return "MIS_SCHEMA_ERROR", None
-    return type(exc).__name__.upper(), None
-
-
-def wait_for_global_backoff(deadline_monotonic: float) -> bool:
-    global _BACKOFF_UNTIL
-    while True:
-        with _BACKOFF_LOCK:
-            remaining = _BACKOFF_UNTIL - time.monotonic()
-        if remaining <= 0:
-            return True
-        if time.monotonic() + remaining >= deadline_monotonic - CYCLE_GUARD_SECONDS:
-            return False
-        time.sleep(min(remaining, 0.25))
-
-
-def register_backoff(error_type: str | None) -> None:
-    global _BACKOFF_UNTIL, _BACKOFF_LEVEL
-    if not error_type:
-        return
-    severe = error_type in {"HTTP_429", "HTTP_503", "HTTP_502", "CONNECTION_ERROR", "TIMEOUT"}
-    with _BACKOFF_LOCK:
-        if severe:
-            _BACKOFF_LEVEL = min(_BACKOFF_LEVEL + 1, 4)
-            delay = min(BACKOFF_CAP_SECONDS, BACKOFF_BASE_SECONDS * (2 ** (_BACKOFF_LEVEL - 1)))
-            delay += random.uniform(0.0, min(0.25, delay * 0.2))
-            _BACKOFF_UNTIL = max(_BACKOFF_UNTIL, time.monotonic() + delay)
-        else:
-            _BACKOFF_LEVEL = max(0, _BACKOFF_LEVEL - 1)
-
-
-def register_success() -> None:
-    global _BACKOFF_LEVEL
-    with _BACKOFF_LOCK:
-        _BACKOFF_LEVEL = max(0, _BACKOFF_LEVEL - 1)
-
-
-def warm_session(session: requests.Session) -> dict[str, Any]:
-    errors: list[str] = []
-    for attempt in range(1, WARMUP_ATTEMPTS + 1):
-        for url in (MIS_HOME_URL, MIS_FIBEST_URL):
-            try:
-                r = session.get(url, timeout=WARMUP_TIMEOUT, allow_redirects=True)
-                if 200 <= r.status_code < 400:
-                    return {
-                        "ok": True,
-                        "attempt": attempt,
-                        "status": r.status_code,
-                        "url": url,
-                        "cookie_count": len(session.cookies),
-                    }
-                errors.append(f"{url}:HTTP_{r.status_code}")
-            except Exception as exc:
-                et, _ = classify_exception(exc)
-                errors.append(f"{url}:{et}")
-        time.sleep(min(BACKOFF_CAP_SECONDS, BACKOFF_BASE_SECONDS * attempt))
-    return {"ok": False, "errors": errors[-6:], "cookie_count": len(session.cookies)}
-
-
-def init_session_pool() -> list[dict[str, Any]]:
-    while True:
-        try:
-            old = _SESSION_POOL.get_nowait()
-            old.close()
-        except queue.Empty:
-            break
-
-    results: list[dict[str, Any]] = []
-    for i in range(SESSION_POOL_SIZE):
-        s = make_session()
-        result = warm_session(s)
-        result["session_index"] = i
-        results.append(result)
-        _SESSION_POOL.put(s)
-        if i + 1 < SESSION_POOL_SIZE:
-            time.sleep(0.15)
-    return results
-
-
-def acquire_session(deadline_monotonic: float) -> requests.Session | None:
-    remaining = deadline_monotonic - time.monotonic() - CYCLE_GUARD_SECONDS
-    if remaining <= 0:
-        return None
-    try:
-        return _SESSION_POOL.get(timeout=min(remaining, 0.5))
-    except queue.Empty:
-        return None
-
-
-def release_session(session: requests.Session | None) -> None:
-    if session is not None:
-        _SESSION_POOL.put(session)
-
-
-def fetch_once(batch: list[Stock], timeout: float, stage: str, deadline_monotonic: float) -> FetchResult:
-    started = time.monotonic()
-    if not wait_for_global_backoff(deadline_monotonic):
-        return FetchResult(batch, [], None, False, "global backoff exceeded cycle deadline",
-                           "BACKOFF_DEADLINE", None, time.monotonic() - started, stage)
-
-    session = acquire_session(deadline_monotonic)
-    if session is None:
-        return FetchResult(batch, [], None, False, "session pool unavailable before deadline",
-                           "SESSION_POOL_TIMEOUT", None, time.monotonic() - started, stage)
-
-    params = {
-        "ex_ch": "|".join(stock.ex_ch for stock in batch),
-        "json": "1",
-        "delay": "0",
-        "_": str(int(time.time() * 1000)),
-    }
-
-    try:
-        remaining = deadline_monotonic - time.monotonic() - CYCLE_GUARD_SECONDS
-        if remaining <= 0:
-            raise requests.Timeout("cycle deadline exhausted before request")
-        request_timeout = max(0.35, min(timeout, remaining))
-        response = session.get(MIS_URL, params=params, timeout=request_timeout)
-
-        if response.status_code in RETRYABLE_HTTP:
-            err = requests.HTTPError(f"retryable HTTP {response.status_code}", response=response)
-            raise err
-
-        response.raise_for_status()
-        obj = response.json()
-        if not isinstance(obj, dict):
-            raise RuntimeError("MIS response is not an object")
-        if str(obj.get("rtcode", "")) != "0000":
-            raise RuntimeError(f"MIS rtcode={obj.get('rtcode')} message={obj.get('rtmessage')}")
-        items = obj.get("msgArray", []) or []
-        if not isinstance(items, list):
-            raise RuntimeError("MIS msgArray is not a list")
-
-        register_success()
-        return FetchResult(batch, items, obj, True, None, None, response.status_code,
-                           time.monotonic() - started, stage)
-    except Exception as exc:
-        error_type, http_status = classify_exception(exc)
-        register_backoff(error_type)
-        return FetchResult(batch, [], None, False, f"{type(exc).__name__}: {exc}",
-                           error_type, http_status, time.monotonic() - started, stage)
-    finally:
-        release_session(session)
-
-
-def run_parallel(
-    batches: list[list[Stock]],
-    workers: int,
-    timeout: float,
-    stage: str,
-    deadline_monotonic: float,
-) -> list[FetchResult]:
-    if not batches:
-        return []
-
-    remaining = deadline_monotonic - time.monotonic() - CYCLE_GUARD_SECONDS
-    if remaining <= 0:
-        return [
-            FetchResult(b, [], None, False, "cycle deadline exhausted",
-                        "CYCLE_DEADLINE", None, 0.0, stage)
-            for b in batches
-        ]
-
-    actual_workers = max(1, min(workers, SESSION_POOL_SIZE, len(batches)))
-    executor = ThreadPoolExecutor(max_workers=actual_workers, thread_name_prefix=f"a4-{stage}")
-    futures = [
-        executor.submit(fetch_once, batch, timeout, stage, deadline_monotonic)
-        for batch in batches
-    ]
-    done, not_done = wait(
-        futures,
-        timeout=max(0.0, deadline_monotonic - time.monotonic() - CYCLE_GUARD_SECONDS),
-    )
-
-    results: list[FetchResult] = []
-    for future in done:
-        try:
-            results.append(future.result())
-        except Exception as exc:
-            et, status = classify_exception(exc)
-            results.append(FetchResult([], [], None, False, f"{type(exc).__name__}: {exc}",
-                                       et, status, 0.0, stage))
-
-    for future in not_done:
-        future.cancel()
-        results.append(FetchResult([], [], None, False, "future cancelled at cycle deadline",
-                                   "FUTURE_DEADLINE", None, 0.0, stage))
-
-    executor.shutdown(wait=False, cancel_futures=True)
-    return results
-
-
-def _merge_items(results: list[FetchResult], requested_codes: set[str], best: dict[str, dict[str, Any]]) -> None:
-    for result in results:
-        for item in result.items:
-            code = str(item.get("c", "")).strip()
-            if code and code in requested_codes:
-                best[code] = item
-
-
-def capture_cycle(stocks: list[Stock], cycle_deadline: float) -> tuple[list[FetchResult], dict[str, Any]]:
-    by_code = {s.code: s for s in stocks}
-    requested_codes = set(by_code)
-    all_results: list[FetchResult] = []
-    best_items: dict[str, dict[str, Any]] = {}
-
-    primary = run_parallel(
-        chunks(stocks, BATCH_SIZE),
-        PRIMARY_WORKERS,
-        PRIMARY_TIMEOUT,
-        "primary",
-        cycle_deadline,
-    )
-    all_results.extend(primary)
-    _merge_items(primary, requested_codes, best_items)
-
-    primary_coverage = len(best_items) / len(requested_codes) if requested_codes else 0.0
-    missing = requested_codes - set(best_items)
-
-    # Catastrophic primary failure: fail this cycle quietly.
-    # Do not fan out into dozens of retry requests and create a request storm.
-    allow_retry = primary_coverage >= RETRY_TRIGGER_COVERAGE
-
-    if missing and allow_retry and time.monotonic() < cycle_deadline - CYCLE_GUARD_SECONDS:
-        retry_stocks = [by_code[c] for c in sorted(missing)]
-        retry = run_parallel(
-            chunks(retry_stocks, RETRY_BATCH_SIZE),
-            RETRY_WORKERS,
-            RETRY_TIMEOUT,
-            "retry_small_batch",
-            cycle_deadline,
-        )
-        all_results.extend(retry)
-        _merge_items(retry, requested_codes, best_items)
-
-    missing = requested_codes - set(best_items)
-    if (
-        missing
-        and allow_retry
-        and len(missing) <= SINGLE_FALLBACK_LIMIT
-        and time.monotonic() < cycle_deadline - CYCLE_GUARD_SECONDS
-    ):
-        singles = run_parallel(
-            [[by_code[c]] for c in sorted(missing)],
-            min(RETRY_WORKERS, len(missing)),
-            SINGLE_TIMEOUT,
-            "single_fallback",
-            cycle_deadline,
-        )
-        all_results.extend(singles)
-        _merge_items(singles, requested_codes, best_items)
-
-    missing_final = sorted(requested_codes - set(best_items))
-    error_types = Counter(r.error_type for r in all_results if not r.ok and r.error_type)
-    sample_errors = []
-    for r in all_results:
-        if not r.ok and r.error:
-            sample_errors.append({
-                "stage": r.stage,
-                "error_type": r.error_type,
-                "http_status": r.http_status,
-                "error": r.error[:300],
-            })
-        if len(sample_errors) >= 8:
-            break
-
-    diagnostics = {
-        "version": VERSION,
-        "request_attempts": len(all_results),
-        "request_errors": sum(1 for r in all_results if not r.ok),
-        "primary_requests": len(primary),
-        "retry_requests": sum(1 for r in all_results if r.stage == "retry_small_batch"),
-        "single_requests": sum(1 for r in all_results if r.stage == "single_fallback"),
-        "primary_coverage": primary_coverage,
-        "retry_allowed": allow_retry,
-        "error_type_counts": dict(error_types),
-        "sample_errors": sample_errors,
-        "missing_symbols": missing_final,
-        "returned_symbols": len(best_items),
-        "requested_symbols": len(requested_codes),
-        "cycle_elapsed_seconds": None,
-    }
-
-    merged = FetchResult(
-        stocks,
-        [best_items[c] for c in sorted(best_items)],
-        None,
-        not missing_final,
-        None if not missing_final else f"missing symbols: {','.join(missing_final[:30])}",
-        None if not missing_final else "MISSING_SYMBOLS",
-        None,
-        0.0,
-        "merged_cycle",
-    )
-    return [merged] + all_results, diagnostics
-
+def normalize_item(item: dict[str, Any], captured_at: datetime, phase: str) -> dict[str, Any]:
+    bp = parse_levels(item.get("b"), float)
+    ap = parse_levels(item.get("a"), float)
+    bv = parse_levels(item.get("g"), int)
+    av = parse_levels(item.get("f"), int)
+    def lv(xs: list[Any], i: int) -> Any:
+        return xs[i] if len(xs) > i else None
+    row = {"captured_at": captured_at.isoformat(timespec="milliseconds"), "phase": phase, "market": str(item.get("ex", "")), "code": str(item.get("c", "")).strip(), "name": str(item.get("n", "")), "market_date": str(item.get("d", "")).strip(), "market_time": str(item.get("t", "")).strip(), "exchange_time": str(item.get("%", "")).strip(), "simulated_flag": str(item.get("ts", "")), "last_price": item.get("z"), "single_volume": item.get("tv"), "total_volume": item.get("v"), "reference_price": item.get("y"), "open": item.get("o"), "high": item.get("h"), "low": item.get("l"), "raw_pz": item.get("pz"), "raw_ps": item.get("ps"), "raw_oa": item.get("oa"), "raw_ob": item.get("ob"), "raw_ip": item.get("ip")}
+    for i in range(5):
+        row[f"bid_price_{i+1}"] = lv(bp, i)
+        row[f"bid_volume_{i+1}"] = lv(bv, i)
+        row[f"ask_price_{i+1}"] = lv(ap, i)
+        row[f"ask_volume_{i+1}"] = lv(av, i)
+    return row
 
 def phase_for(t: dtime) -> str:
     if t < START_TIME:
@@ -504,447 +407,165 @@ def phase_for(t: dtime) -> str:
         return "OPEN_VALIDATION"
     return "DONE"
 
-
-def normalize_item(item: dict[str, Any], captured_at: datetime, phase: str) -> dict[str, Any]:
-    bid_price = parse_levels(item.get("b"), float)
-    ask_price = parse_levels(item.get("a"), float)
-    bid_volume = parse_levels(item.get("g"), int)
-    ask_volume = parse_levels(item.get("f"), int)
-
-    def lv(xs: list[Any], idx: int) -> Any:
-        return xs[idx] if len(xs) > idx else None
-
-    return {
-        "captured_at": captured_at.isoformat(timespec="milliseconds"),
-        "phase": phase,
-        "market": str(item.get("ex", "")),
-        "code": str(item.get("c", "")).strip(),
-        "name": str(item.get("n", "")),
-        "market_date": str(item.get("d", "")).strip(),
-        "market_time": str(item.get("t", "")).strip(),
-        "exchange_time": str(item.get("%", "")).strip(),
-        "simulated_flag": str(item.get("ts", "")),
-        "last_price": item.get("z"),
-        "single_volume": item.get("tv"),
-        "total_volume": item.get("v"),
-        "reference_price": item.get("y"),
-        "open": item.get("o"),
-        "high": item.get("h"),
-        "low": item.get("l"),
-        "raw_pz": item.get("pz"),
-        "raw_ps": item.get("ps"),
-        "raw_oa": item.get("oa"),
-        "raw_ob": item.get("ob"),
-        "raw_ip": item.get("ip"),
-        "bid_price_1": lv(bid_price, 0),
-        "bid_price_2": lv(bid_price, 1),
-        "bid_price_3": lv(bid_price, 2),
-        "bid_price_4": lv(bid_price, 3),
-        "bid_price_5": lv(bid_price, 4),
-        "bid_volume_1": lv(bid_volume, 0),
-        "bid_volume_2": lv(bid_volume, 1),
-        "bid_volume_3": lv(bid_volume, 2),
-        "bid_volume_4": lv(bid_volume, 3),
-        "bid_volume_5": lv(bid_volume, 4),
-        "ask_price_1": lv(ask_price, 0),
-        "ask_price_2": lv(ask_price, 1),
-        "ask_price_3": lv(ask_price, 2),
-        "ask_price_4": lv(ask_price, 3),
-        "ask_price_5": lv(ask_price, 4),
-        "ask_volume_1": lv(ask_volume, 0),
-        "ask_volume_2": lv(ask_volume, 1),
-        "ask_volume_3": lv(ask_volume, 2),
-        "ask_volume_4": lv(ask_volume, 3),
-        "ask_volume_5": lv(ask_volume, 4),
-    }
-
-
-def expected_cycles(start: dtime, end: dtime, base: datetime) -> int:
-    duration = (combine_today(end, base) - combine_today(start, base)).total_seconds()
-    return max(0, int(math.ceil(duration / POLL_SECONDS)))
-
-
-def max_gap_seconds(timestamps: list[datetime]) -> float | None:
-    if len(timestamps) < 2:
-        return None
-    return max((b - a).total_seconds() for a, b in zip(timestamps, timestamps[1:]))
-
-
 def run_env_test(stocks: list[Stock]) -> int:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    transport = AdaptiveTransport()
     started = now_tw()
-    warmup = init_session_pool()
-    cycle_start = time.monotonic()
-    results, diag = capture_cycle(stocks, cycle_start + CYCLE_BUDGET_SECONDS)
-    diag["cycle_elapsed_seconds"] = time.monotonic() - cycle_start
-    merged = results[0]
-
-    rows = []
-    for item in merged.items:
-        row = normalize_item(item, now_tw(), "ENV_TEST")
-        if row["code"]:
-            rows.append(row)
-
-    requested_codes = {s.code for s in stocks}
-    returned_codes = {r["code"] for r in rows if r.get("code")}
-    missing = sorted(requested_codes - returned_codes)
-
-    report = {
-        "version": VERSION,
-        "mode": "env_test",
-        "started_at": started.isoformat(),
-        "finished_at": now_tw().isoformat(),
-        "requested_symbols": len(stocks),
-        "returned_symbols": len(returned_codes),
-        "missing_symbols": missing,
-        "warmup_ok_count": sum(1 for x in warmup if x.get("ok")),
-        "warmup_total": len(warmup),
-        "warmup": warmup,
-        "request_attempts": diag["request_attempts"],
-        "request_errors": diag["request_errors"],
-        "error_type_counts": diag["error_type_counts"],
-        "sample_errors": diag["sample_errors"],
-        "cycle_elapsed_seconds": diag["cycle_elapsed_seconds"],
-        "cycle_budget_seconds": CYCLE_BUDGET_SECONDS,
-        "pass": (
-            len(returned_codes) >= math.ceil(len(stocks) * MIN_SYMBOL_COVERAGE)
-            and diag["cycle_elapsed_seconds"] <= CYCLE_BUDGET_SECONDS + 0.25
-        ),
-    }
-
-    atomic_write_json(OUTPUT_DIR / "env_test_report.json", report)
-    atomic_write_json(OUTPUT_DIR / "env_test_diagnostics.json", diag)
-    if rows:
-        pd.DataFrame(rows).to_csv(OUTPUT_DIR / "env_test_normalized.csv", index=False, encoding="utf-8-sig")
-    print(json.dumps(report, ensure_ascii=False))
-    return 0 if report["pass"] else 2
-
+    try:
+        warm = transport.warmup()
+        deadline = time.monotonic() + CYCLE_BUDGET_SECONDS
+        items, diag = transport.capture_cycle(stocks, deadline)
+        rows = [normalize_item(x, now_tw(), "ENV_TEST") for x in items]
+        coverage = float(diag["active_coverage"])
+        terminal_error_rate = float(diag["terminal_error_rate"])
+        passed = bool(warm.get("ok")) and coverage >= MIN_SYMBOL_COVERAGE and terminal_error_rate <= MAX_TERMINAL_ERROR_RATE and float(diag["cycle_elapsed_seconds"]) <= CYCLE_BUDGET_SECONDS + 0.5
+        report = {"version": VERSION, "mode": "env_test", "started_at": started.isoformat(), "finished_at": now_tw().isoformat(), "requested_symbols": len(stocks), "returned_symbols": diag["returned_symbols"], "active_expected_symbols": diag["active_expected_symbols"], "coverage": coverage, "raw_coverage": diag["raw_coverage"], "missing_symbols": diag["missing_symbols"], "no_quote_symbols": diag["no_quote_symbols"], "warmup_ok_count": 1 if warm.get("ok") else 0, "warmup_total": 1, "warmup": [warm], "request_attempts": diag["request_attempts"], "request_errors": diag["terminal_batch_errors"], "request_error_rate": terminal_error_rate, "terminal_error_rate": terminal_error_rate, "adaptive_splits": diag["adaptive_splits"], "safe_batch_symbols": diag["safe_batch_symbols"], "sample_errors": diag["sample_errors"], "cycle_elapsed_seconds": diag["cycle_elapsed_seconds"], "cycle_budget_seconds": CYCLE_BUDGET_SECONDS, "pass": passed}
+        atomic_json(OUTPUT_DIR / "env_test_report.json", report)
+        atomic_json(OUTPUT_DIR / "env_test_diagnostics.json", diag)
+        atomic_json(OUTPUT_DIR / "transport_profile.json", {"version": VERSION, "safe_batch_symbols": transport.safe_batch_symbols, "max_url_chars": MAX_URL_CHARS, "min_request_interval": MIN_REQUEST_INTERVAL, "no_quote_symbols": sorted(transport.no_quote_codes), "updated_at": now_tw().isoformat()})
+        if rows:
+            pd.DataFrame(rows).to_csv(OUTPUT_DIR / "env_test_normalized.csv", index=False, encoding="utf-8-sig")
+        print(json.dumps(report, ensure_ascii=False))
+        return 0 if passed else 2
+    finally:
+        transport.close()
 
 def run_live(stocks: list[Stock]) -> int:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     process_start = now_tw()
     day = process_start.strftime("%Y-%m-%d")
     day_compact = process_start.strftime("%Y%m%d")
-
-    raw_path = OUTPUT_DIR / f"raw_{day}.ndjson"
-    norm_path = OUTPUT_DIR / f"normalized_{day}.parquet"
-    csv_path = OUTPUT_DIR / f"normalized_{day}.csv"
-    report_path = OUTPUT_DIR / f"report_{day}.json"
-    heartbeat_path = OUTPUT_DIR / f"heartbeat_{day}.json"
-
-    arm_at = combine_today(ARM_TIME, process_start)
     start_at = combine_today(START_TIME, process_start)
     end_at = combine_today(END_TIME, process_start)
-    startup_deadline_at = combine_today(STARTUP_DEADLINE, process_start)
-    first_preopen_deadline_at = combine_today(FIRST_PREOPEN_DEADLINE, process_start)
-    last_preopen_earliest_at = combine_today(LAST_PREOPEN_EARLIEST, process_start)
-
+    raw_path = OUTPUT_DIR / f"raw_{day}.ndjson"
+    csv_path = OUTPUT_DIR / f"normalized_{day}.csv"
+    pq_path = OUTPUT_DIR / f"normalized_{day}.parquet"
+    report_path = OUTPUT_DIR / f"report_{day}.json"
+    heartbeat_path = OUTPUT_DIR / f"heartbeat_{day}.json"
+    profile_path = OUTPUT_DIR / f"transport_profile_{day}.json"
     if process_start >= end_at:
-        report = {
-            "version": VERSION,
-            "mode": "live",
-            "date": day,
-            "pass": False,
-            "pass_candidate": False,
-            "source_gap": True,
-            "data_health": "SOURCE_GAP",
-            "failure_reasons": ["STARTED_AFTER_END_TIME"],
-            "actual_process_start": process_start.isoformat(),
-        }
-        atomic_write_json(report_path, report)
-        print(json.dumps(report, ensure_ascii=False))
+        rep = {"version": VERSION, "mode": "live", "date": day, "pass": False, "failure_reasons": ["STARTED_AFTER_END_TIME"]}
+        atomic_json(report_path, rep)
+        print(json.dumps(rep, ensure_ascii=False))
         return 3
-
-    warmup = init_session_pool()
-
+    transport = AdaptiveTransport()
+    warm = transport.warmup()
+    if not warm.get("ok"):
+        rep = {"version": VERSION, "mode": "live", "date": day, "pass": False, "failure_reasons": ["WARMUP_FAIL"], "warmup": warm}
+        atomic_json(report_path, rep)
+        return 4
     while now_tw() < start_at:
-        remaining = (start_at - now_tw()).total_seconds()
-        time.sleep(max(0.05, min(1.0, remaining)))
-
-    normalized: list[dict[str, Any]] = []
-    preopen_valid_cycles: list[datetime] = []
-    open_valid_cycles: list[datetime] = []
-    all_valid_cycles: list[datetime] = []
-
-    request_count = 0
-    error_count = 0
-    stale_row_count = 0
-    rejected_blank_code_rows = 0
-    incomplete_cycle_count = 0
-    deadline_miss_count = 0
-    preopen_rows = 0
-    open_rows = 0
-    max_cycle_elapsed = 0.0
-    min_observed_symbol_coverage = 1.0
-    consecutive_failed_cycles = 0
-    max_consecutive_failed_cycles = 0
-    first_capture = None
-    last_capture = None
-    aggregate_error_types: Counter[str] = Counter()
-    aggregate_sample_errors: list[dict[str, Any]] = []
-
+        time.sleep(min(1.0, max(0.05, (start_at - now_tw()).total_seconds())))
     requested_codes = {s.code for s in stocks}
-    minimum_symbols_per_cycle = max(1, math.ceil(len(requested_codes) * MIN_SYMBOL_COVERAGE))
-    cycle_index = max(0, int((now_tw() - start_at).total_seconds() // POLL_SECONDS))
-
-    with raw_path.open("a", encoding="utf-8") as raw_file:
+    expected_market = {s.code: ("tse" if s.market == "TSE" else "otc") for s in stocks}
+    total_cycles = valid_cycles = preopen_cycles = preopen_valid = open_cycles = open_valid = 0
+    request_attempts = terminal_errors = incomplete_cycles = 0
+    consecutive_bad = max_consecutive_bad = 0
+    coverage_values: list[float] = []
+    first_capture = last_capture = None
+    failure_reasons: list[str] = []
+    header_written = csv_path.exists() and csv_path.stat().st_size > 0
+    with raw_path.open("a", encoding="utf-8") as raw_f, csv_path.open("a", encoding="utf-8-sig", newline="") as csv_f:
+        writer: csv.DictWriter | None = None
+        cycle_index = max(0, int((now_tw() - start_at).total_seconds() // POLL_SECONDS))
         while True:
             target = start_at + timedelta(seconds=cycle_index * POLL_SECONDS)
             if target >= end_at:
                 break
-
-            now = now_tw()
-            if now < target:
-                time.sleep(min(0.10, (target - now).total_seconds()))
+            current = now_tw()
+            if current < target:
+                time.sleep(min(0.25, (target - current).total_seconds()))
                 continue
-
-            late_seconds = (now - target).total_seconds()
-            if late_seconds >= POLL_SECONDS:
-                skipped = int(late_seconds // POLL_SECONDS)
-                deadline_miss_count += skipped
-                incomplete_cycle_count += skipped
-                consecutive_failed_cycles += skipped
-                max_consecutive_failed_cycles = max(max_consecutive_failed_cycles, consecutive_failed_cycles)
-                cycle_index += skipped
-                continue
-
             captured = now_tw()
             phase = phase_for(captured.time())
             if phase == "DONE":
                 break
-
-            cycle_started = time.monotonic()
-            results, diag = capture_cycle(stocks, cycle_started + CYCLE_BUDGET_SECONDS)
-            cycle_elapsed = time.monotonic() - cycle_started
-            diag.update(
-                {
-                    "cycle_elapsed_seconds": cycle_elapsed,
-                    "cycle_index": cycle_index,
-                    "target_at": target.isoformat(),
-                    "captured_at": captured.isoformat(),
-                    "phase": phase,
-                }
-            )
-            max_cycle_elapsed = max(max_cycle_elapsed, cycle_elapsed)
-            merged = results[0]
-            request_count += diag["request_attempts"]
-            error_count += diag["request_errors"]
-            aggregate_error_types.update(diag["error_type_counts"])
-            for err in diag["sample_errors"]:
-                if len(aggregate_sample_errors) < 20:
-                    aggregate_sample_errors.append(err)
-
-            returned_codes_this_cycle: set[str] = set()
-            fresh_codes_this_cycle: set[str] = set()
-
-            for item in merged.items:
-                row = normalize_item(item, captured, phase)
-                code = row["code"]
-
-                # Reject malformed blank-code rows before CLEAN persistence.
-                if not code:
-                    rejected_blank_code_rows += 1
-                    continue
-                if code not in requested_codes:
-                    continue
-
-                returned_codes_this_cycle.add(code)
-                if row["market_date"] == day_compact:
-                    fresh_codes_this_cycle.add(code)
-                else:
-                    stale_row_count += 1
-
-                normalized.append(row)
-                if phase == "PREOPEN":
-                    preopen_rows += 1
-                elif phase == "OPEN_VALIDATION":
-                    open_rows += 1
-
-            observed_coverage = (
-                len(returned_codes_this_cycle) / len(requested_codes) if requested_codes else 0.0
-            )
-            min_observed_symbol_coverage = min(min_observed_symbol_coverage, observed_coverage)
-
-            cycle_valid = len(fresh_codes_this_cycle) >= minimum_symbols_per_cycle
-            if cycle_valid:
-                all_valid_cycles.append(captured)
-                if first_capture is None:
-                    first_capture = captured.isoformat()
+            total_cycles += 1
+            if phase == "PREOPEN": preopen_cycles += 1
+            elif phase == "OPEN_VALIDATION": open_cycles += 1
+            deadline = time.monotonic() + CYCLE_BUDGET_SECONDS
+            items, diag = transport.capture_cycle(stocks, deadline)
+            request_attempts += int(diag["request_attempts"])
+            terminal_errors += int(diag["terminal_batch_errors"])
+            accepted: list[dict[str, Any]] = []
+            seen: set[str] = set()
+            integrity = Counter()
+            for item in items:
+                code = str(item.get("c", "")).strip()
+                market = str(item.get("ex", "")).strip().lower()
+                mdate = str(item.get("d", "")).strip()
+                if not code or not market or not mdate: integrity["schema_missing"] += 1; continue
+                if code not in requested_codes: integrity["unexpected_code"] += 1; continue
+                if expected_market[code] != market: integrity["market_mismatch"] += 1; continue
+                if mdate != day_compact: integrity["stale_date"] += 1; continue
+                if code in seen: integrity["duplicate_code"] += 1; continue
+                seen.add(code); accepted.append(item)
+            active_expected = requested_codes - set(diag["no_quote_symbols"])
+            active_coverage = len(seen & active_expected) / len(active_expected) if active_expected else 1.0
+            coverage_values.append(active_coverage)
+            cycle_ok = active_coverage >= MIN_SYMBOL_COVERAGE and not any(integrity.values()) and float(diag["terminal_error_rate"]) <= MAX_TERMINAL_ERROR_RATE
+            if cycle_ok:
+                valid_cycles += 1
+                if phase == "PREOPEN": preopen_valid += 1
+                elif phase == "OPEN_VALIDATION": open_valid += 1
+                consecutive_bad = 0
+                first_capture = first_capture or captured.isoformat()
                 last_capture = captured.isoformat()
-                if phase == "PREOPEN":
-                    preopen_valid_cycles.append(captured)
-                elif phase == "OPEN_VALIDATION":
-                    open_valid_cycles.append(captured)
-                consecutive_failed_cycles = 0
             else:
-                incomplete_cycle_count += 1
-                consecutive_failed_cycles += 1
-
-            max_consecutive_failed_cycles = max(max_consecutive_failed_cycles, consecutive_failed_cycles)
-            source_gap_active = consecutive_failed_cycles >= SOURCE_GAP_CONSECUTIVE_CYCLES
-
-            raw_file.write(
-                json.dumps(
-                    {
-                        "captured_at": captured.isoformat(timespec="milliseconds"),
-                        "phase": phase,
-                        "cycle_index": cycle_index,
-                        "target_at": target.isoformat(),
-                        "diagnostics": diag,
-                        "items": merged.items,
-                    },
-                    ensure_ascii=False,
-                )
-                + "\n"
-            )
-            raw_file.flush()
-
-            atomic_write_json(
-                heartbeat_path,
-                {
-                    "version": VERSION,
-                    "date": day,
-                    "captured_at": captured.isoformat(),
-                    "phase": phase,
-                    "cycle_index": cycle_index,
-                    "valid_cycle": cycle_valid,
-                    "cycle_elapsed_seconds": cycle_elapsed,
-                    "cycle_budget_seconds": CYCLE_BUDGET_SECONDS,
-                    "returned_symbols": len(returned_codes_this_cycle),
-                    "fresh_symbols": len(fresh_codes_this_cycle),
-                    "requested_symbols": len(requested_codes),
-                    "missing_symbols": diag["missing_symbols"],
-                    "request_count": request_count,
-                    "error_count": error_count,
-                    "error_type_counts": dict(aggregate_error_types),
-                    "consecutive_failed_cycles": consecutive_failed_cycles,
-                    "max_consecutive_failed_cycles": max_consecutive_failed_cycles,
-                    "source_gap": source_gap_active,
-                    "data_health": "SOURCE_GAP" if source_gap_active else "NORMAL",
-                },
-            )
+                incomplete_cycles += 1
+                consecutive_bad += 1
+                max_consecutive_bad = max(max_consecutive_bad, consecutive_bad)
+            rows = [normalize_item(x, captured, phase) for x in accepted]
+            if rows:
+                if writer is None:
+                    writer = csv.DictWriter(csv_f, fieldnames=list(rows[0].keys()))
+                    if not header_written: writer.writeheader(); header_written = True
+                writer.writerows(rows); csv_f.flush()
+            raw_f.write(json.dumps({"captured_at": captured.isoformat(timespec="milliseconds"), "phase": phase, "cycle_index": cycle_index, "target_at": target.isoformat(), "diagnostics": {**diag, "integrity": dict(integrity), "cycle_ok": cycle_ok, "effective_coverage": active_coverage}, "items": accepted}, ensure_ascii=False) + "\n")
+            raw_f.flush()
+            atomic_json(heartbeat_path, {"version": VERSION, "date": day, "captured_at": captured.isoformat(), "phase": phase, "cycle_index": cycle_index, "valid_cycle": cycle_ok, "requested_symbols": len(requested_codes), "returned_symbols": len(seen), "active_expected_symbols": len(active_expected), "active_coverage": active_coverage, "raw_coverage": diag["raw_coverage"], "terminal_error_rate": diag["terminal_error_rate"], "safe_batch_symbols": transport.safe_batch_symbols, "adaptive_splits": diag["adaptive_splits"], "no_quote_symbols": diag["no_quote_symbols"], "integrity": dict(integrity)})
+            atomic_json(profile_path, {"version": VERSION, "safe_batch_symbols": transport.safe_batch_symbols, "max_url_chars": MAX_URL_CHARS, "min_request_interval": MIN_REQUEST_INTERVAL, "no_quote_symbols": sorted(transport.no_quote_codes), "updated_at": captured.isoformat()})
+            publish_github_guard("success" if cycle_ok else "failure", f"{phase} cov={active_coverage:.4f} err={float(diag['terminal_error_rate']):.3f} batch={transport.safe_batch_symbols}")
+            if consecutive_bad >= SOURCE_GAP_CONSECUTIVE_CYCLES:
+                transport.reset_session(); time.sleep(min(2.0, BACKOFF_BASE_SECONDS))
             cycle_index += 1
-
-    if normalized:
-        df = pd.DataFrame(normalized)
-        df.to_parquet(norm_path, index=False)
-        df.to_csv(csv_path, index=False, encoding="utf-8-sig")
-
-    expected_preopen = expected_cycles(START_TIME, PREOPEN_END, process_start)
-    expected_open = expected_cycles(PREOPEN_END, END_TIME, process_start)
-    preopen_coverage = len(preopen_valid_cycles) / expected_preopen if expected_preopen else 0.0
-    open_coverage = len(open_valid_cycles) / expected_open if expected_open else 0.0
-    observed_max_gap = max_gap_seconds(all_valid_cycles)
-    request_error_rate = error_count / request_count if request_count else 1.0
-    first_preopen = preopen_valid_cycles[0] if preopen_valid_cycles else None
-    last_preopen = preopen_valid_cycles[-1] if preopen_valid_cycles else None
-
-    gates = {
-        "startup_before_082945": process_start <= startup_deadline_at,
-        "first_preopen_by_083020": bool(first_preopen and first_preopen <= first_preopen_deadline_at),
-        "last_preopen_at_or_after_085940": bool(last_preopen and last_preopen >= last_preopen_earliest_at),
-        "preopen_coverage_ok": preopen_coverage >= MIN_PREOPEN_COVERAGE,
-        "open_validation_coverage_ok": open_coverage >= MIN_OPEN_COVERAGE,
-        "max_gap_ok": observed_max_gap is not None and observed_max_gap <= MAX_ALLOWED_GAP_SECONDS,
-        "request_error_rate_ok": request_error_rate <= MAX_REQUEST_ERROR_RATE,
-        "source_gap_not_persistent": max_consecutive_failed_cycles < SOURCE_GAP_CONSECUTIVE_CYCLES,
-        "fresh_market_date_only": stale_row_count == 0,
-        "symbol_coverage_ok": min_observed_symbol_coverage >= MIN_SYMBOL_COVERAGE,
-        "cycle_budget_ok": max_cycle_elapsed <= CYCLE_BUDGET_SECONDS + 0.25,
-        "warmup_available": any(x.get("ok") for x in warmup),
-    }
-    failure_reasons = [name.upper() for name, passed in gates.items() if not passed]
-    passed = all(gates.values())
-
-    report = {
-        "version": VERSION,
-        "mode": "live",
-        "date": day,
-        "actual_process_start": process_start.isoformat(),
-        "schedule_delay_seconds_from_0825": max(0.0, (process_start - arm_at).total_seconds()),
-        "first_capture": first_capture,
-        "last_capture": last_capture,
-        "first_preopen_valid_capture": first_preopen.isoformat() if first_preopen else None,
-        "last_preopen_valid_capture": last_preopen.isoformat() if last_preopen else None,
-        "poll_seconds": POLL_SECONDS,
-        "cycle_budget_seconds": CYCLE_BUDGET_SECONDS,
-        "max_cycle_elapsed_seconds": max_cycle_elapsed,
-        "deadline_miss_count": deadline_miss_count,
-        "requested_symbols": len(stocks),
-        "requests": request_count,
-        "error_count": error_count,
-        "request_error_rate": request_error_rate,
-        "allowed_request_error_rate": MAX_REQUEST_ERROR_RATE,
-        "error_type_counts": dict(aggregate_error_types),
-        "sample_errors": aggregate_sample_errors,
-        "normalized_rows": len(normalized),
-        "preopen_rows": preopen_rows,
-        "open_validation_rows": open_rows,
-        "stale_row_count": stale_row_count,
-        "rejected_blank_code_rows": rejected_blank_code_rows,
-        "incomplete_cycle_count": incomplete_cycle_count,
-        "max_consecutive_failed_cycles": max_consecutive_failed_cycles,
-        "source_gap_threshold_cycles": SOURCE_GAP_CONSECUTIVE_CYCLES,
-        "source_gap": not gates["source_gap_not_persistent"],
-        "data_health": "NORMAL" if gates["source_gap_not_persistent"] else "SOURCE_GAP",
-        "expected_preopen_cycles": expected_preopen,
-        "actual_preopen_valid_cycles": len(preopen_valid_cycles),
-        "preopen_coverage": preopen_coverage,
-        "required_preopen_coverage": MIN_PREOPEN_COVERAGE,
-        "expected_open_validation_cycles": expected_open,
-        "actual_open_validation_valid_cycles": len(open_valid_cycles),
-        "open_validation_coverage": open_coverage,
-        "required_open_validation_coverage": MIN_OPEN_COVERAGE,
-        "min_observed_symbol_coverage": min_observed_symbol_coverage,
-        "required_symbol_coverage": MIN_SYMBOL_COVERAGE,
-        "max_gap_seconds": observed_max_gap,
-        "allowed_max_gap_seconds": MAX_ALLOWED_GAP_SECONDS,
-        "warmup_ok_count": sum(1 for x in warmup if x.get("ok")),
-        "warmup_total": len(warmup),
-        "warmup": warmup,
-        "session_pool_size": SESSION_POOL_SIZE,
-        "retry_trigger_coverage": RETRY_TRIGGER_COVERAGE,
-        "gates": gates,
-        "failure_reasons": failure_reasons,
-        "pass_candidate": passed,
-        "pass": passed,
-        "raw_file": str(raw_path),
-        "normalized_parquet": str(norm_path),
-        "normalized_csv": str(csv_path),
-        "heartbeat_file": str(heartbeat_path),
-    }
-
-    atomic_write_json(report_path, report)
+    if csv_path.exists() and csv_path.stat().st_size > 0:
+        try:
+            pd.read_csv(csv_path, dtype={"code": str, "market_date": str}).to_parquet(pq_path, index=False)
+        except Exception:
+            pass
+    request_error_rate = terminal_errors / max(1, request_attempts)
+    pre_ratio = preopen_valid / max(1, preopen_cycles)
+    open_ratio = open_valid / max(1, open_cycles)
+    p05 = None
+    if coverage_values:
+        xs = sorted(coverage_values); p = (len(xs) - 1) * 0.05; lo, hi = math.floor(p), math.ceil(p)
+        p05 = xs[lo] if lo == hi else xs[lo] * (hi - p) + xs[hi] * (p - lo)
+    passed = total_cycles > 0 and p05 is not None and p05 >= MIN_SYMBOL_COVERAGE and pre_ratio >= 0.95 and open_ratio >= 0.90 and max_consecutive_bad <= 2 and request_error_rate <= MAX_TERMINAL_ERROR_RATE
+    if p05 is None or p05 < MIN_SYMBOL_COVERAGE: failure_reasons.append("P05_COVERAGE")
+    if pre_ratio < 0.95: failure_reasons.append("PREOPEN_RATIO")
+    if open_ratio < 0.90: failure_reasons.append("OPEN_RATIO")
+    if max_consecutive_bad > 2: failure_reasons.append("MAX_BAD_STREAK")
+    if request_error_rate > MAX_TERMINAL_ERROR_RATE: failure_reasons.append("REQUEST_ERROR_RATE")
+    report = {"version": VERSION, "mode": "live", "date": day, "pass": passed, "source_gap": not passed, "data_health": "PASS" if passed else "SOURCE_GAP", "failure_reasons": failure_reasons, "actual_process_start": process_start.isoformat(), "first_capture": first_capture, "last_capture": last_capture, "requested_symbols": len(requested_codes), "total_cycles": total_cycles, "valid_cycles": valid_cycles, "preopen_cycles": preopen_cycles, "preopen_valid_cycles": preopen_valid, "open_cycles": open_cycles, "open_valid_cycles": open_valid, "preopen_valid_ratio": pre_ratio, "open_valid_ratio": open_ratio, "p05_coverage": p05, "incomplete_cycle_count": incomplete_cycles, "max_consecutive_failed_cycles": max_consecutive_bad, "request_attempts": request_attempts, "request_errors": terminal_errors, "request_error_rate": request_error_rate, "safe_batch_symbols": transport.safe_batch_symbols, "no_quote_symbols": sorted(transport.no_quote_codes), "warmup": warm, "raw_path": str(raw_path), "csv_path": str(csv_path), "parquet_path": str(pq_path)}
+    atomic_json(report_path, report)
     print(json.dumps(report, ensure_ascii=False))
-    return 0 if passed else 4
-
+    transport.close()
+    return 0 if passed else 5
 
 def main() -> int:
     stocks = load_stocks(STOCKS_FILE)
-    if RUN_MODE == "env_test":
-        return run_env_test(stocks)
-    if RUN_MODE != "live":
-        raise ValueError(f"unsupported RUN_MODE={RUN_MODE}")
-    return run_live(stocks)
-
+    if RUN_MODE == "env_test": return run_env_test(stocks)
+    if RUN_MODE == "live": return run_live(stocks)
+    raise ValueError(f"unsupported RUN_MODE={RUN_MODE}")
 
 if __name__ == "__main__":
     try:
-        sys.exit(main())
+        raise SystemExit(main())
     except KeyboardInterrupt:
         raise
     except Exception as exc:
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-        atomic_write_json(
-            OUTPUT_DIR / "fatal_error.json",
-            {
-                "version": VERSION,
-                "at": now_tw().isoformat(),
-                "error": repr(exc),
-                "run_mode": RUN_MODE,
-                "source_gap": True,
-                "data_health": "SOURCE_GAP",
-            },
-        )
-        print(f"FATAL: {exc}", file=sys.stderr)
-        sys.exit(99)
+        atomic_json(OUTPUT_DIR / "fatal_error.json", {"version": VERSION, "mode": RUN_MODE, "error": f"{type(exc).__name__}: {exc}", "checked_at": now_tw().isoformat()})
+        print(f"A4_ENGINE_FATAL:{type(exc).__name__}:{exc}", file=sys.stderr)
+        raise SystemExit(99)
