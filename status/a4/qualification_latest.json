@@ -18,13 +18,13 @@
         "warmup": true
       },
       "requested_symbols": 1975,
-      "returned_symbols": 1968,
-      "coverage": 0.9964556962025316,
-      "raw_coverage": 0.9964556962025316,
-      "request_attempts": 29,
+      "returned_symbols": 1969,
+      "coverage": 0.9969620253164557,
+      "raw_coverage": 0.9969620253164557,
+      "request_attempts": 28,
       "request_errors": 0,
       "request_error_rate": 0.0,
-      "cycle_elapsed_seconds": 7.274390267000001,
+      "cycle_elapsed_seconds": 16.098595046999975,
       "cycle_budget_seconds": 20.0,
       "safe_batch_symbols": 90,
       "adaptive_splits": 0,
@@ -34,13 +34,12 @@
         "4747",
         "4804",
         "5371",
-        "6241",
         "8105"
       ],
       "no_quote_symbols": [],
       "sample_errors": [],
       "engine_returncode": 0,
-      "engine_log_tail": "{\"version\": \"3.0.0\", \"mode\": \"env_test\", \"started_at\": \"2026-08-24T16:08:23.379642+08:00\", \"finished_at\": \"2026-08-24T16:08:31.274999+08:00\", \"requested_symbols\": 1975, \"returned_symbols\": 1968, \"active_expected_symbols\": 1975, \"coverage\": 0.9964556962025316, \"raw_coverage\": 0.9964556962025316, \"missing_symbols\": [\"1589\", \"2867\", \"4747\", \"4804\", \"5371\", \"6241\", \"8105\"], \"no_quote_symbols\": [], \"warmup_ok_count\": 1, \"warmup_total\": 1, \"warmup\": [{\"ok\": true, \"attempt\": 1, \"status\": 200, \"returned_probe_symbols\": [\"2330\", \"6488\"]}], \"request_attempts\": 29, \"request_errors\": 0, \"request_error_rate\": 0.0, \"terminal_error_rate\": 0.0, \"adaptive_splits\": 0, \"safe_batch_symbols\": 90, \"sample_errors\": [], \"cycle_elapsed_seconds\": 7.274390267000001, \"cycle_budget_seconds\": 20.0, \"pass\": true}\n\n"
+      "engine_log_tail": "{\"version\": \"3.0.0\", \"mode\": \"env_test\", \"started_at\": \"2026-08-25T09:40:55.108654+08:00\", \"finished_at\": \"2026-08-25T09:41:12.068343+08:00\", \"requested_symbols\": 1975, \"returned_symbols\": 1969, \"active_expected_symbols\": 1975, \"coverage\": 0.9969620253164557, \"raw_coverage\": 0.9969620253164557, \"missing_symbols\": [\"1589\", \"2867\", \"4747\", \"4804\", \"5371\", \"8105\"], \"no_quote_symbols\": [], \"warmup_ok_count\": 1, \"warmup_total\": 1, \"warmup\": [{\"ok\": true, \"attempt\": 1, \"status\": 200, \"returned_probe_symbols\": [\"2330\", \"6488\"]}], \"request_attempts\": 28, \"request_errors\": 0, \"request_error_rate\": 0.0, \"terminal_error_rate\": 0.0, \"adaptive_splits\": 0, \"safe_batch_symbols\": 90, \"sample_errors\": [], \"cycle_elapsed_seconds\": 16.098595046999975, \"cycle_budget_seconds\": 20.0, \"pass\": true}\n\n"
     },
     {
       "round": 2,
@@ -54,13 +53,13 @@
         "warmup": true
       },
       "requested_symbols": 1975,
-      "returned_symbols": 1968,
-      "coverage": 0.9964556962025316,
-      "raw_coverage": 0.9964556962025316,
-      "request_attempts": 29,
+      "returned_symbols": 1969,
+      "coverage": 0.9969620253164557,
+      "raw_coverage": 0.9969620253164557,
+      "request_attempts": 28,
       "request_errors": 0,
       "request_error_rate": 0.0,
-      "cycle_elapsed_seconds": 7.199493321000006,
+      "cycle_elapsed_seconds": 7.0047518110000055,
       "cycle_budget_seconds": 20.0,
       "safe_batch_symbols": 90,
       "adaptive_splits": 0,
@@ -70,13 +69,12 @@
         "4747",
         "4804",
         "5371",
-        "6241",
         "8105"
       ],
       "no_quote_symbols": [],
       "sample_errors": [],
       "engine_returncode": 0,
-      "engine_log_tail": "{\"version\": \"3.0.0\", \"mode\": \"env_test\", \"started_at\": \"2026-08-24T16:08:36.876616+08:00\", \"finished_at\": \"2026-08-24T16:08:44.896772+08:00\", \"requested_symbols\": 1975, \"returned_symbols\": 1968, \"active_expected_symbols\": 1975, \"coverage\": 0.9964556962025316, \"raw_coverage\": 0.9964556962025316, \"missing_symbols\": [\"1589\", \"2867\", \"4747\", \"4804\", \"5371\", \"6241\", \"8105\"], \"no_quote_symbols\": [], \"warmup_ok_count\": 1, \"warmup_total\": 1, \"warmup\": [{\"ok\": true, \"attempt\": 1, \"status\": 200, \"returned_probe_symbols\": [\"2330\", \"6488\"]}], \"request_attempts\": 29, \"request_errors\": 0, \"request_error_rate\": 0.0, \"terminal_error_rate\": 0.0, \"adaptive_splits\": 0, \"safe_batch_symbols\": 90, \"sample_errors\": [], \"cycle_elapsed_seconds\": 7.199493321000006, \"cycle_budget_seconds\": 20.0, \"pass\": true}\n\n"
+      "engine_log_tail": "{\"version\": \"3.0.0\", \"mode\": \"env_test\", \"started_at\": \"2026-08-25T09:41:17.624071+08:00\", \"finished_at\": \"2026-08-25T09:41:25.489111+08:00\", \"requested_symbols\": 1975, \"returned_symbols\": 1969, \"active_expected_symbols\": 1975, \"coverage\": 0.9969620253164557, \"raw_coverage\": 0.9969620253164557, \"missing_symbols\": [\"1589\", \"2867\", \"4747\", \"4804\", \"5371\", \"8105\"], \"no_quote_symbols\": [], \"warmup_ok_count\": 1, \"warmup_total\": 1, \"warmup\": [{\"ok\": true, \"attempt\": 1, \"status\": 200, \"returned_probe_symbols\": [\"2330\", \"6488\"]}], \"request_attempts\": 28, \"request_errors\": 0, \"request_error_rate\": 0.0, \"terminal_error_rate\": 0.0, \"adaptive_splits\": 0, \"safe_batch_symbols\": 90, \"sample_errors\": [], \"cycle_elapsed_seconds\": 7.0047518110000055, \"cycle_budget_seconds\": 20.0, \"pass\": true}\n\n"
     },
     {
       "round": 3,
@@ -90,13 +88,13 @@
         "warmup": true
       },
       "requested_symbols": 1975,
-      "returned_symbols": 1968,
-      "coverage": 0.9964556962025316,
-      "raw_coverage": 0.9964556962025316,
-      "request_attempts": 29,
+      "returned_symbols": 1969,
+      "coverage": 0.9969620253164557,
+      "raw_coverage": 0.9969620253164557,
+      "request_attempts": 28,
       "request_errors": 0,
       "request_error_rate": 0.0,
-      "cycle_elapsed_seconds": 10.882052641000001,
+      "cycle_elapsed_seconds": 7.312266821999998,
       "cycle_budget_seconds": 20.0,
       "safe_batch_symbols": 90,
       "adaptive_splits": 0,
@@ -106,14 +104,13 @@
         "4747",
         "4804",
         "5371",
-        "6241",
         "8105"
       ],
       "no_quote_symbols": [],
       "sample_errors": [],
       "engine_returncode": 0,
-      "engine_log_tail": "{\"version\": \"3.0.0\", \"mode\": \"env_test\", \"started_at\": \"2026-08-24T16:08:50.472208+08:00\", \"finished_at\": \"2026-08-24T16:09:01.976205+08:00\", \"requested_symbols\": 1975, \"returned_symbols\": 1968, \"active_expected_symbols\": 1975, \"coverage\": 0.9964556962025316, \"raw_coverage\": 0.9964556962025316, \"missing_symbols\": [\"1589\", \"2867\", \"4747\", \"4804\", \"5371\", \"6241\", \"8105\"], \"no_quote_symbols\": [], \"warmup_ok_count\": 1, \"warmup_total\": 1, \"warmup\": [{\"ok\": true, \"attempt\": 1, \"status\": 200, \"returned_probe_symbols\": [\"2330\", \"6488\"]}], \"request_attempts\": 29, \"request_errors\": 0, \"request_error_rate\": 0.0, \"terminal_error_rate\": 0.0, \"adaptive_splits\": 0, \"safe_batch_symbols\": 90, \"sample_errors\": [], \"cycle_elapsed_seconds\": 10.882052641000001, \"cycle_budget_seconds\": 20.0, \"pass\": true}\n\n"
+      "engine_log_tail": "{\"version\": \"3.0.0\", \"mode\": \"env_test\", \"started_at\": \"2026-08-25T09:41:31.043316+08:00\", \"finished_at\": \"2026-08-25T09:41:39.787623+08:00\", \"requested_symbols\": 1975, \"returned_symbols\": 1969, \"active_expected_symbols\": 1975, \"coverage\": 0.9969620253164557, \"raw_coverage\": 0.9969620253164557, \"missing_symbols\": [\"1589\", \"2867\", \"4747\", \"4804\", \"5371\", \"8105\"], \"no_quote_symbols\": [], \"warmup_ok_count\": 1, \"warmup_total\": 1, \"warmup\": [{\"ok\": true, \"attempt\": 1, \"status\": 200, \"returned_probe_symbols\": [\"2330\", \"6488\"]}], \"request_attempts\": 28, \"request_errors\": 0, \"request_error_rate\": 0.0, \"terminal_error_rate\": 0.0, \"adaptive_splits\": 0, \"safe_batch_symbols\": 90, \"sample_errors\": [], \"cycle_elapsed_seconds\": 7.312266821999998, \"cycle_budget_seconds\": 20.0, \"pass\": true}\n\n"
     }
   ],
-  "checked_at": "2026-08-24T16:09:02+08:00"
+  "checked_at": "2026-08-25T09:41:39+08:00"
 }
