@@ -2,23 +2,31 @@
   "component": "A4_001A",
   "version": "A4_001A_COMPLETE_CONTROL_POINT_V3.0.0",
   "mode": "watchdog",
-  "stage": "first",
+  "stage": "final",
   "date": "2026-08-27",
-  "status": "RECOVERY_REQUIRED",
-  "reason": "CONTROL_FAILED",
-  "desired_attempt": 1,
-  "recovery_dispatched": true,
-  "trigger": {
-    "component": "A4_001A",
-    "status": "RECOVERY_REQUESTED",
-    "date": "2026-08-27",
-    "attempt": 1,
-    "requested_at": "2026-08-27T17:51:19+08:00",
-    "reason": "no_healthy_runner_0817",
-    "requested_by": "QTS_A4_COMPLETE_CONTROL_POINT_V3"
-  },
+  "status": "HEALTHY_NOOP",
+  "reason": "CONTROL_IN_PROGRESS",
+  "desired_attempt": 2,
+  "recovery_dispatched": false,
+  "trigger": null,
   "state": {
     "observations": [
+      {
+        "run_id": 33060455118,
+        "job_id": 98477645475,
+        "status": "in_progress",
+        "conclusion": null,
+        "started_at": "2026-08-27T09:51:32Z",
+        "event": "workflow_dispatch"
+      },
+      {
+        "run_id": 33060420007,
+        "job_id": 98477558313,
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-08-27T09:51:08Z",
+        "event": "schedule"
+      },
       {
         "run_id": 33055693364,
         "job_id": 98461796457,
@@ -28,9 +36,26 @@
         "event": "schedule"
       }
     ],
-    "healthy": [],
+    "healthy": [
+      {
+        "run_id": 33060455118,
+        "job_id": 98477645475,
+        "status": "in_progress",
+        "conclusion": null,
+        "started_at": "2026-08-27T09:51:32Z",
+        "event": "workflow_dispatch"
+      }
+    ],
     "queued": [],
     "failures": [
+      {
+        "run_id": 33060420007,
+        "job_id": 98477558313,
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-08-27T09:51:08Z",
+        "event": "schedule"
+      },
       {
         "run_id": 33055693364,
         "job_id": 98461796457,
@@ -42,5 +67,5 @@
     ],
     "successes": []
   },
-  "checked_at": "2026-08-27T17:51:28+08:00"
+  "checked_at": "2026-08-27T17:52:47+08:00"
 }
