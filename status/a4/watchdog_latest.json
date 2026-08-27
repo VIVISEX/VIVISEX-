@@ -2,70 +2,45 @@
   "component": "A4_001A",
   "version": "A4_001A_COMPLETE_CONTROL_POINT_V3.0.0",
   "mode": "watchdog",
-  "stage": "final",
-  "date": "2026-08-26",
-  "status": "HEALTHY_NOOP",
-  "reason": "CONTROL_IN_PROGRESS",
-  "desired_attempt": 2,
-  "recovery_dispatched": false,
-  "trigger": null,
+  "stage": "first",
+  "date": "2026-08-27",
+  "status": "RECOVERY_REQUIRED",
+  "reason": "CONTROL_FAILED",
+  "desired_attempt": 1,
+  "recovery_dispatched": true,
+  "trigger": {
+    "component": "A4_001A",
+    "status": "RECOVERY_REQUESTED",
+    "date": "2026-08-27",
+    "attempt": 1,
+    "requested_at": "2026-08-27T17:51:19+08:00",
+    "reason": "no_healthy_runner_0817",
+    "requested_by": "QTS_A4_COMPLETE_CONTROL_POINT_V3"
+  },
   "state": {
     "observations": [
       {
-        "run_id": 32921039097,
-        "job_id": 98034525902,
-        "status": "in_progress",
-        "conclusion": null,
-        "started_at": "2026-08-26T01:59:41Z",
-        "event": "workflow_dispatch"
-      },
-      {
-        "run_id": 32921017428,
-        "job_id": 98034464023,
-        "status": "completed",
-        "conclusion": "skipped",
-        "started_at": "2026-08-26T01:59:16Z",
-        "event": "schedule"
-      },
-      {
-        "run_id": 32920217702,
-        "job_id": 98032187463,
+        "run_id": 33055693364,
+        "job_id": 98461796457,
         "status": "completed",
         "conclusion": "failure",
-        "started_at": "2026-08-26T01:46:15Z",
+        "started_at": "2026-08-27T08:48:53Z",
         "event": "schedule"
       }
     ],
-    "healthy": [
-      {
-        "run_id": 32921039097,
-        "job_id": 98034525902,
-        "status": "in_progress",
-        "conclusion": null,
-        "started_at": "2026-08-26T01:59:41Z",
-        "event": "workflow_dispatch"
-      }
-    ],
+    "healthy": [],
     "queued": [],
     "failures": [
       {
-        "run_id": 32921017428,
-        "job_id": 98034464023,
-        "status": "completed",
-        "conclusion": "skipped",
-        "started_at": "2026-08-26T01:59:16Z",
-        "event": "schedule"
-      },
-      {
-        "run_id": 32920217702,
-        "job_id": 98032187463,
+        "run_id": 33055693364,
+        "job_id": 98461796457,
         "status": "completed",
         "conclusion": "failure",
-        "started_at": "2026-08-26T01:46:15Z",
+        "started_at": "2026-08-27T08:48:53Z",
         "event": "schedule"
       }
     ],
     "successes": []
   },
-  "checked_at": "2026-08-26T10:00:26+08:00"
+  "checked_at": "2026-08-27T17:51:28+08:00"
 }
