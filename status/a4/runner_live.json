@@ -1,11 +1,11 @@
 {
   "component": "A4_001A",
   "status": "RUNNER_STARTED",
-  "version": "A4_001A_COMPLETE_CONTROL_POINT_V3.0.0",
-  "date": "2026-08-31",
-  "started_at": "2026-08-31T13:40:11+08:00",
-  "run_id": "33361334195",
+  "version": "A4_001A_COMPLETE_CONTROL_POINT_V2.5.0",
+  "date": "2026-08-21",
+  "started_at": "2026-08-21T09:09:06+08:00",
+  "run_id": "32435233408",
   "run_attempt": "1",
-  "event_name": "workflow_dispatch",
-  "source_commit": "4d44d778fa1263e17cac71c272cfbfb622ed460f"
+  "event_name": "push",
+  "source_commit": "1a367f0a3b8b833ab4e66b26045145218ba696e2"
 }
