@@ -1,9 +1,9 @@
 {
   "component": "A4_001A",
   "status": "RECOVERY_REQUESTED",
-  "date": "2026-08-31",
-  "attempt": 2,
-  "requested_at": "2026-08-31T13:39:51+08:00",
-  "reason": "no_healthy_runner_0822",
+  "date": "2026-09-01",
+  "attempt": 1,
+  "requested_at": "2026-09-01T13:11:31+08:00",
+  "reason": "no_healthy_runner_0817",
   "requested_by": "QTS_A4_COMPLETE_CONTROL_POINT_V3"
 }
