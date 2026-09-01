@@ -2,23 +2,39 @@
   "component": "A4_001A",
   "version": "A4_001A_COMPLETE_CONTROL_POINT_V3.0.0",
   "mode": "watchdog",
-  "stage": "first",
+  "stage": "final",
   "date": "2026-09-01",
   "status": "RECOVERY_REQUIRED",
   "reason": "CONTROL_FAILED",
-  "desired_attempt": 1,
+  "desired_attempt": 2,
   "recovery_dispatched": true,
   "trigger": {
     "component": "A4_001A",
     "status": "RECOVERY_REQUESTED",
     "date": "2026-09-01",
-    "attempt": 1,
-    "requested_at": "2026-09-01T13:11:31+08:00",
-    "reason": "no_healthy_runner_0817",
+    "attempt": 2,
+    "requested_at": "2026-09-01T13:13:36+08:00",
+    "reason": "no_healthy_runner_0822",
     "requested_by": "QTS_A4_COMPLETE_CONTROL_POINT_V3"
   },
   "state": {
     "observations": [
+      {
+        "run_id": 33472641787,
+        "job_id": 99745354998,
+        "status": "completed",
+        "conclusion": "failure",
+        "started_at": "2026-09-01T05:11:36Z",
+        "event": "workflow_dispatch"
+      },
+      {
+        "run_id": 33472619301,
+        "job_id": 99745287827,
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-09-01T05:11:13Z",
+        "event": "schedule"
+      },
       {
         "run_id": 33470901960,
         "job_id": 99740282237,
@@ -32,6 +48,22 @@
     "queued": [],
     "failures": [
       {
+        "run_id": 33472641787,
+        "job_id": 99745354998,
+        "status": "completed",
+        "conclusion": "failure",
+        "started_at": "2026-09-01T05:11:36Z",
+        "event": "workflow_dispatch"
+      },
+      {
+        "run_id": 33472619301,
+        "job_id": 99745287827,
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-09-01T05:11:13Z",
+        "event": "schedule"
+      },
+      {
         "run_id": 33470901960,
         "job_id": 99740282237,
         "status": "completed",
@@ -42,5 +74,5 @@
     ],
     "successes": []
   },
-  "checked_at": "2026-09-01T13:11:33+08:00"
+  "checked_at": "2026-09-01T13:13:38+08:00"
 }
